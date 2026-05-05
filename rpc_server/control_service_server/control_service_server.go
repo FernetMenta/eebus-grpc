@@ -74,6 +74,7 @@ type Server struct {
 	stateMachine     *fsm.FSM
 	grpcServer       *grpc.Server
 	grpcHealthServer *health.Server
+	grpcIpv4Addr     string
 	certificate      *tls.Certificate
 
 	useCaseRegistry []useCaseEntryType
@@ -87,6 +88,7 @@ func NewServer(eebusService *eebus_service.Service, certificate *tls.Certificate
 		stateMachine: NewStateMachine(),
 		grpcServer:   nil,
 		certificate:  certificate,
+		grpcIpv4Addr: "",
 	}
 }
 
@@ -127,6 +129,15 @@ func (h *Server) ResetService(_ context.Context, _ *control_service.EmptyRequest
 	h.eebusService.Shutdown()
 
 	h.stateMachine = NewStateMachine()
+
+	var useCaseServer usecase_server.UseCaseServer = nil
+	for _, entry := range h.useCaseRegistry {
+		useCaseServer = entry.useCaseServer
+		if useCaseServer != nil {
+			useCaseServer.Stop()
+		}
+	}
+	h.useCaseRegistry = []useCaseEntryType{}
 
 	return &control_service.EmptyResponse{}, nil
 }
@@ -333,13 +344,13 @@ func (h *Server) AddUseCase(_ context.Context, req *control_service.AddUseCaseRe
 	}
 	h.useCaseRegistry = append(h.useCaseRegistry, useCaseEntry)
 
-	port, err := useCaseServer.Start(nil)
+	port, err := useCaseServer.Start(h.grpcIpv4Addr, nil)
 	if err != nil {
 		return &control_service.AddUseCaseResponse{}, fmt.Errorf("Failed to start use case server: %v", err)
 	}
 
 	return &control_service.AddUseCaseResponse{
-		Endpoint: fmt.Sprintf("localhost:%v", port),
+		Endpoint: fmt.Sprintf("%s:%v", h.grpcIpv4Addr, port),
 	}, nil
 }
 
@@ -402,7 +413,8 @@ func (h *Server) SubscribeDiscoveryEvents(
 	}
 }
 
-func (h *Server) Start(port *int) (int, error) {
+func (h *Server) Start(ipv4Addr string, port *int) (int, error) {
+	h.grpcIpv4Addr = ipv4Addr
 	if port == nil {
 		return -1, fmt.Errorf("no port specified")
 	}

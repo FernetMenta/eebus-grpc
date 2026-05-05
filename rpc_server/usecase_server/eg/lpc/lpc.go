@@ -166,7 +166,7 @@ func (h *Server) ConsumptionNominalMax(_ context.Context, req *lpc.ConsumptionNo
 	}, resultErr
 }
 
-func (h *Server) Start(port *int) (int, error) {
+func (h *Server) Start(ipv4Addr string, port *int) (int, error) {
 	var res int
 	if port != nil {
 		return -1, fmt.Errorf("port is specifiedm but not allowed")
@@ -174,9 +174,9 @@ func (h *Server) Start(port *int) (int, error) {
 	if h.grpcServer != nil {
 		return -1, fmt.Errorf("grpc server is already running")
 	}
-	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	lis, err := net.Listen("tcp", fmt.Sprintf("%s:0", ipv4Addr))
 	res = lis.Addr().(*net.TCPAddr).Port
-	fmt.Printf("server running at port %d\n", res)
+	log.Printf("server running at port %d\n", res)
 
 	if err != nil {
 		return -1, fmt.Errorf("failed to listen: %v", err)
@@ -197,6 +197,7 @@ func (h *Server) Stop() error {
 		return fmt.Errorf("grpc server is not running")
 	}
 	h.grpcServer.Stop()
+	h.Debug("use case server stopped\n")
 	h.grpcServer = nil
 	return nil
 }

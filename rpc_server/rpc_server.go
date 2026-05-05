@@ -4,6 +4,6 @@
 package rpc_server
 
 type RPCServer interface {
-	Start(port *int) (int, error)
+	Start(ipv4Addr string, port *int) (int, error)
 	Stop() error
 }
