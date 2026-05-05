@@ -38,6 +38,7 @@ const (
 
 func main() {
 	var rpcPort = flag.Int("port", 50051, "The server port")
+	var rpcIpv4Addr = flag.String("ipv4Addr", "", "ipv4 address to bind the gRPC server to")
 	var certificateFilePath = flag.String("certificate-path", "", "The path to the certificate")
 	var privateKeyFilePath = flag.String("private-key-path", "", "The path to the private key")
 	flag.Parse()
@@ -56,6 +57,7 @@ func main() {
 	app.Infof("Certificate path: %s", *certificateFilePath)
 	app.Infof("Private key path: %s", *privateKeyFilePath)
 	app.Infof("Port: %d", *rpcPort)
+	app.Infof("IPv4 Address: %s", *rpcIpv4Addr)
 
 	cert := certificates.SetupCertificate(
 		*certificateFilePath,
@@ -69,7 +71,7 @@ func main() {
 	app.eebusService = eebus_service.NewService()
 	app.controlServiceServer = control_service_server.NewServer(app.eebusService, &cert)
 
-	app.controlServiceServer.Start(rpcPort)
+	app.controlServiceServer.Start(*rpcIpv4Addr, rpcPort)
 
 	// Clean exit to make sure mdns shutdown is invoked
 	sig := make(chan os.Signal, 1)
