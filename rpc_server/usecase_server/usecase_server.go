@@ -29,6 +29,12 @@ func NewBaseUseCaseServer() *BaseUseCaseServer {
 }
 
 func (h *BaseUseCaseServer) OnUseCaseEvent(ski string, device spineapi.DeviceRemoteInterface, entity spineapi.EntityRemoteInterface, event api.EventType) {
+	// entity can be nil when the remote device disconnects entirely
+	// (e.g. UseCaseSupportUpdate fired by removeDeviceFromAvailableEntityScenarios).
+	// Skip events with no entity address rather than panic.
+	if entity == nil {
+		return
+	}
 	remoteEntityAddress := type_conversions.ConvertEEBUSEntityAddress(entity.Address().Entity)
 	useCaseEvent := type_conversions.ConvertEEBUSEventType(event)
 	useCaseEventResponse := control_service.SubscribeUseCaseEventsResponse{
