@@ -54,7 +54,7 @@ func (h *hems) run(
 		[]shipapi.DeviceCategoryType{shipapi.DeviceCategoryTypeEnergyManagementSystem},
 		model.DeviceTypeTypeEnergyManagementSystem,
 		[]model.EntityTypeType{model.EntityTypeTypeCEM},
-		eebusPort, certificate, time.Second*4)
+		eebusPort, certificate, time.Second*4, nil, nil)
 	if err != nil {
 		h.Errorf("Error creating configuration: %s", err)
 		os.Exit(1)
@@ -73,7 +73,7 @@ func (h *hems) run(
 	h.uceglpc = eglpc.NewLPC(localEntity, nil)
 	h.myService.AddUseCase(h.uceglpc)
 
-	h.myService.RegisterRemoteSKI(remoteSki)
+	h.myService.RegisterRemoteService(shipapi.ServiceIdentity{SKI: remoteSki})
 
 	h.myService.Start()
 	// defer h.myService.Shutdown()
@@ -129,7 +129,7 @@ func (h *hems) sendDummyLoadLimits() {
 		h.uceglpc.WriteConsumptionLimit(
 			remoteEntity,
 			loadLimit,
-			func(result model.ResultDataType) {
+			func(result model.ResultDataType, msgCounter model.MsgCounterType) {
 				if result.ErrorNumber != nil {
 					h.Errorf("Result Error: %d", *result.ErrorNumber)
 				}
@@ -151,12 +151,12 @@ func (h *hems) DummyLimitsRoutine() {
 
 // EEBUSServiceHandler
 
-func (h *hems) RemoteSKIConnected(service api.ServiceInterface, ski string) {
-	fmt.Println("remote ski connected: ", ski)
+func (h *hems) RemoteServiceConnected(service api.ServiceInterface, identity shipapi.ServiceIdentity) {
+	fmt.Println("remote ski connected: ", identity.SKI)
 }
 
-func (h *hems) RemoteSKIDisconnected(service api.ServiceInterface, ski string) {
-	fmt.Println("remote ski disconnected: ", ski)
+func (h *hems) RemoteServiceDisconnected(service api.ServiceInterface, identity shipapi.ServiceIdentity) {
+	fmt.Println("remote ski disconnected: ", identity.SKI)
 }
 
 func (h *hems) VisibleRemoteServicesUpdated(service api.ServiceInterface, entries []shipapi.RemoteService) {
@@ -164,11 +164,11 @@ func (h *hems) VisibleRemoteServicesUpdated(service api.ServiceInterface, entrie
 
 func (h *hems) ServiceShipIDUpdate(ski string, shipdID string) {}
 
-func (h *hems) ServicePairingDetailUpdate(ski string, detail *shipapi.ConnectionStateDetail) {
-	if ski == remoteSki && detail.State() == shipapi.ConnectionStateRemoteDeniedTrust {
+func (h *hems) ServicePairingDetailUpdate(identity shipapi.ServiceIdentity, detail *shipapi.ConnectionStateDetail) {
+	if identity.SKI == remoteSki && detail.State() == shipapi.ConnectionStateRemoteDeniedTrust {
 		fmt.Println("The remote service denied trust. Exiting.")
-		h.myService.CancelPairingWithSKI(ski)
-		h.myService.UnregisterRemoteSKI(ski)
+		h.myService.CancelPairing(identity)
+		h.myService.UnregisterRemoteService(identity)
 		h.myService.Shutdown()
 		os.Exit(0)
 	}
@@ -217,4 +217,25 @@ func main() {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	<-sig
 	// User exit
+}
+
+// ServiceAutoTrustFailed implements [api.ServiceReaderInterface].
+func (h *hems) ServiceAutoTrustFailed(service api.ServiceInterface, identity shipapi.ServiceIdentity, reason error) {
+}
+
+// ServiceAutoTrustRemoved implements [api.ServiceReaderInterface].
+func (h *hems) ServiceAutoTrustRemoved(service api.ServiceInterface, identity shipapi.ServiceIdentity, reason string) {
+}
+
+// ServiceAutoTrusted implements [api.ServiceReaderInterface].
+func (h *hems) ServiceAutoTrusted(service api.ServiceInterface, identity shipapi.ServiceIdentity) {
+}
+
+// ServiceUpdated implements [api.ServiceReaderInterface].
+func (h *hems) ServiceUpdated(identity shipapi.ServiceIdentity) {
+}
+
+// VisibleRemoteMdnsServicesUpdated implements [api.ServiceReaderInterface].
+func (h *hems) VisibleRemoteMdnsServicesUpdated(service api.ServiceInterface, entries []shipapi.RemoteMdnsService) {
+	fmt.Printf("Visible remote services updated: %d services\n", len(entries))
 }

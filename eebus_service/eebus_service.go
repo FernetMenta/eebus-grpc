@@ -29,34 +29,49 @@ type Service struct {
 
 	// discoveryMu guards discoverySnapshot and discoverySubscribers.
 	discoveryMu          sync.Mutex
-	discoverySnapshot    map[string]shipapi.RemoteService
+	discoverySnapshot    map[string]shipapi.RemoteMdnsService
 	discoverySubscribers []*discoverySubscriber
 }
 
 func NewService() *Service {
 	return &Service{
 		isConnected:          false,
-		discoverySnapshot:    make(map[string]shipapi.RemoteService),
+		discoverySnapshot:    make(map[string]shipapi.RemoteMdnsService),
 		discoverySubscribers: nil,
 	}
 }
 
-func (h *Service) RemoteSKIConnected(service api.ServiceInterface, ski string) {
+func (h *Service) RemoteServiceConnected(service api.ServiceInterface, identity shipapi.ServiceIdentity) {
 	h.isConnected = true
 }
 
-func (h *Service) RemoteSKIDisconnected(service api.ServiceInterface, ski string) {
+func (h *Service) RemoteServiceDisconnected(service api.ServiceInterface, identity shipapi.ServiceIdentity) {
 	h.isConnected = false
+}
+
+// ServiceAutoTrustFailed implements api.ServiceReaderInterface.
+func (h *Service) ServiceAutoTrustFailed(service api.ServiceInterface, identity shipapi.ServiceIdentity, reason error) {
+	log.Errorf("Auto Trust failed for identity %v: %v\n", identity.String(), reason)
+}
+
+// ServiceAutoTrustRemoved implements [api.ServiceReaderInterface].
+func (h *Service) ServiceAutoTrustRemoved(service api.ServiceInterface, identity shipapi.ServiceIdentity, reason string) {
+	log.Debugf("Auto Trust removed for identity %v: %v\n", identity.String(), reason)
+}
+
+// ServiceAutoTrusted implements [api.ServiceReaderInterface].
+func (h *Service) ServiceAutoTrusted(service api.ServiceInterface, identity shipapi.ServiceIdentity) {
+	log.Debugf("Auto Trust granted for identity %v\n", identity.String())
 }
 
 // VisibleRemoteServicesUpdated is called by ship-go with the full current
 // list of visible remote services every mDNS update. We diff against the
 // last-seen snapshot and emit DISCOVERED / REMOVED events to all active
 // SubscribeDiscoveries subscribers.
-func (h *Service) VisibleRemoteServicesUpdated(_ api.ServiceInterface, entries []shipapi.RemoteService) {
+func (h *Service) VisibleRemoteMdnsServicesUpdated(service api.ServiceInterface, entries []shipapi.RemoteMdnsService) {
 	h.discoveryMu.Lock()
 
-	newSnapshot := make(map[string]shipapi.RemoteService, len(entries))
+	newSnapshot := make(map[string]shipapi.RemoteMdnsService, len(entries))
 	for _, entry := range entries {
 		newSnapshot[entry.Ski] = entry
 	}
@@ -97,10 +112,19 @@ func (h *Service) VisibleRemoteServicesUpdated(_ api.ServiceInterface, entries [
 	}
 }
 
+// ServiceUpdated is called by the embedded service.Service to notify the
+// handler that service information has changed. The explicit implementation
+// here prevents infinite recursion: without it, the Go embedding machinery
+// auto-generates a forwarder that calls h.Service.ServiceUpdated which in
+// turn calls h.serviceHandler.ServiceUpdated (which is h itself), looping
+// forever.
+func (h *Service) ServiceUpdated(identity shipapi.ServiceIdentity) {
+}
+
 func (h *Service) ServiceShipIDUpdate(ski string, shipdID string) {
 }
 
-func (h *Service) ServicePairingDetailUpdate(ski string, detail *shipapi.ConnectionStateDetail) {
+func (h *Service) ServicePairingDetailUpdate(identity shipapi.ServiceIdentity, detail *shipapi.ConnectionStateDetail) {
 }
 
 func (h *Service) AllowWaitingForTrust(ski string) bool {
@@ -111,11 +135,11 @@ func (h *Service) AllowWaitingForTrust(ski string) bool {
 // RemoteService entry. The caller must hold h.discoveryMu (the method
 // itself does not touch mu-protected state, but it is invoked from
 // locked sections).
-func (h *Service) buildDiscoveryEventLocked(eventType control_service.DiscoveryEvent_Type, entry shipapi.RemoteService) *control_service.DiscoveryEvent {
+func (h *Service) buildDiscoveryEventLocked(eventType control_service.DiscoveryEvent_Type, entry shipapi.RemoteMdnsService) *control_service.DiscoveryEvent {
 	return &control_service.DiscoveryEvent{
 		Type:           eventType,
 		RemoteSki:      entry.Ski,
-		ShipIdentifier: entry.Identifier,
+		ShipIdentifier: entry.ShipID,
 		Brand:          entry.Brand,
 		Model:          entry.Model,
 		DeviceType:     entry.Type,
@@ -128,7 +152,7 @@ func (h *Service) buildDiscoveryEventLocked(eventType control_service.DiscoveryE
 // trusted at the moment this is called. Nil-safe: returns false if the
 // SKI is not yet known to the hub.
 func (h *Service) skiTrusted(ski string) bool {
-	details := h.RemoteServiceForSKI(ski)
+	details := h.RemoteServiceFor(shipapi.ServiceIdentity{SKI: ski})
 	if details == nil {
 		return false
 	}

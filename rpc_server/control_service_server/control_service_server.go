@@ -168,6 +168,8 @@ func (h *Server) SetConfig(_ context.Context, req *control_service.SetConfigRequ
 		int(req.GetPort()),
 		*h.certificate,
 		time.Duration(req.GetHeartbeatTimeoutSeconds())*time.Second,
+		nil,
+		nil,
 	)
 	if err != nil {
 		h.Errorf("Failed to create configuration: %v", err)
@@ -241,7 +243,7 @@ func (h *Server) RegisterRemoteSki(_ context.Context, req *control_service.Regis
 		return &control_service.EmptyResponse{}, fmt.Errorf("Service must be in ready or running state")
 	}
 
-	h.eebusService.RegisterRemoteSKI(req.GetRemoteSki())
+	h.eebusService.RegisterRemoteService(shipapi.ServiceIdentity{SKI: req.GetRemoteSki()})
 
 	return &control_service.EmptyResponse{}, nil
 }

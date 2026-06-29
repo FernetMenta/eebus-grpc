@@ -62,7 +62,7 @@ func (h *Server) WriteConsumptionLimit(_ context.Context, req *lpc.WriteConsumpt
 	remoteEntity := remoteDevice.Entity(type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
 
 	resultCh := make(chan model.ResultDataType)
-	resultCB := func(result model.ResultDataType) {
+	resultCB := func(result model.ResultDataType, msgCounter model.MsgCounterType) {
 		resultCh <- result
 	}
 
