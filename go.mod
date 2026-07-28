@@ -3,7 +3,7 @@ module github.com/enbility/eebus-grpc
 go 1.24.1
 
 require (
-	github.com/enbility/eebus-go v0.7.1-0.20260629112136-732b9168ac93
+	github.com/enbility/eebus-go v0.7.1-0.20260720111250-363db3c5c262
 	github.com/enbility/ship-go v0.6.1-0.20260518113001-134687068e3c
 	github.com/enbility/spine-go v0.7.1-0.20260520153416-0104ce40c885
 	github.com/looplab/fsm v1.0.2
