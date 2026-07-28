@@ -16,11 +16,11 @@ COPY --link utils/ utils/
 COPY --link eebus_service/ eebus_service/
 COPY --link go.mod go.sum ./
 
-RUN apk add --no-cache git && go mod download && GOBIN=/out go install github.com/grpc-ecosystem/grpc-health-probe@v0.4.52    
+RUN apk add --no-cache git && go mod download && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOBIN=/out go install github.com/grpc-ecosystem/grpc-health-probe@v0.4.52
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build \
         -trimpath \
         -ldflags="-s -w" \
@@ -61,4 +61,5 @@ ENV IPV4_ADDR="0.0.0.0"
 ENV CRT_PATH="/certs/myhems_cert"
 ENV KEY_PATH="/certs/myhems_key"
 ENV GRPC_PORT="50051"
+ENV LOG_LEVEL="info"
 ENTRYPOINT ["/bin/bash", "-c", "/usr/local/bin/entrypoint.sh"]

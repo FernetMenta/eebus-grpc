@@ -5,5 +5,6 @@ exec /usr/local/bin/eebus-grpc \
     -private-key-path "${KEY_PATH}" \
     -port "${GRPC_PORT}" \
     -ipv4Addr "${IPV4_ADDR}" \
+    -log-level "${LOG_LEVEL:-info}" \
     "$@"
 

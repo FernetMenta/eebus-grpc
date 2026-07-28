@@ -9,6 +9,8 @@ services:
       CRT_PATH: "/certs/myhems_cert"
       KEY_PATH: "/certs/myhems_key"
       GRPC_PORT: 50051
+      # Possible values: trace, debug, info, error
+      LOG_LEVEL: info
     networks:
       internal:
         ipv4_address: 172.30.0.10
