@@ -58,14 +58,23 @@ Contains utility functions.
 
 ## Build image
 
+Build and push multi-platform image (amd64 + arm64):
+
 ```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t dein-registry/eebus-grpc:latest \
+  -t fernetmenta/iobroker.eebus-grpc:latest \
   --push .
 ```
 
-local testing:
+Note: This requires a buildx builder with the `docker-container` driver (for multi-platform support). If your current builder doesn't support arm64, set one up:
+
+```bash
+docker buildx create --name multiarch --use
+docker buildx inspect --bootstrap
+```
+
+Local testing (single platform, loaded into local docker):
 
 ```bash
 docker buildx build --platform linux/amd64 -t eebus-grpc:amd64 --load .
@@ -78,13 +87,20 @@ Run grpc server (certs will be created automatically in the specified certs dire
 mkdir certs
 docker run --rm -it \
   --network=host \
-  -p 50051:50051 \
   -v "$PWD/certs:/certs" \
-  eebus-grpc:amd64 \
-  -certificate-path /certs/myhems_cert \
-  -private-key-path /certs/myhems_key \
-  -port 50051 -ipv4Addr "0.0.0.0"
+  -e LOG_LEVEL=debug \
+  fernetmenta/iobroker.eebus-grpc:latest
 ```
+
+The entrypoint uses these environment variables (with their Dockerfile defaults):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `IPV4_ADDR` | `0.0.0.0` | gRPC server bind address |
+| `CRT_PATH` | `/certs/myhems_cert` | Path to certificate |
+| `KEY_PATH` | `/certs/myhems_key` | Path to private key |
+| `GRPC_PORT` | `50051` | gRPC server port |
+| `LOG_LEVEL` | `info` | Log level: trace, debug, info, error |
 ## Docker Compose
 An example [docker-compose.yml](docker-compose.yml) file is provided. You need to adopt the values in that file to your needs. It shows how to use the eebus-grpc container with another iobroker container. Both containers are using Docker Macvlan driver to be able to communicate directly with other devices in the LAN. The Docker Bridge network is used to for the GRPC communication between the containers.
 
