@@ -456,7 +456,7 @@ func (h *Server) Start(ipv4Addr string, port *int) (int, error) {
 	if h.grpcServer != nil {
 		return -1, fmt.Errorf("grpc server is already running")
 	}
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", ipv4Addr, *port))
 	if err != nil {
 		return -1, fmt.Errorf("failed to listen: %v", err)
 	}
