@@ -41,7 +41,11 @@ func main() {
 	var rpcIpv4Addr = flag.String("ipv4Addr", "", "ipv4 address to bind the gRPC server to")
 	var certificateFilePath = flag.String("certificate-path", "", "The path to the certificate")
 	var privateKeyFilePath = flag.String("private-key-path", "", "The path to the private key")
+	var logLevel = flag.String("log-level", "info", "Log level: trace, debug, info, error")
 	flag.Parse()
+
+	log.SetLevel(log.ParseLevel(*logLevel))
+	log.Debugf("Log level set to: %s", *logLevel)
 
 	var app app
 	if *certificateFilePath == "" {

@@ -5,29 +5,60 @@ package logging
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
 type Logger struct{}
 
-type logLevel int
+type LogLevel int
 
 const (
-	logLevelTrace logLevel = iota
-	logLevelDebug
-	logLevelInfo
-	logLevelError
+	LogLevelTrace LogLevel = iota
+	LogLevelDebug
+	LogLevelInfo
+	LogLevelError
 )
 
-func (log_level logLevel) String() string {
+// currentLevel controls the minimum severity that gets printed.
+var currentLevel LogLevel = LogLevelTrace
+
+// SetLevel sets the minimum log level. Messages below this level are discarded.
+func SetLevel(level LogLevel) {
+	currentLevel = level
+}
+
+// GetLevel returns the current minimum log level.
+func GetLevel() LogLevel {
+	return currentLevel
+}
+
+// ParseLevel converts a string (case-insensitive) to a LogLevel.
+// Returns LogLevelInfo if the string is not recognized.
+func ParseLevel(s string) LogLevel {
+	switch strings.ToLower(s) {
+	case "trace":
+		return LogLevelTrace
+	case "debug":
+		return LogLevelDebug
+	case "info":
+		return LogLevelInfo
+	case "error":
+		return LogLevelError
+	default:
+		return LogLevelInfo
+	}
+}
+
+func (log_level LogLevel) String() string {
 	switch log_level {
-	case logLevelTrace:
+	case LogLevelTrace:
 		return "TRACE"
-	case logLevelDebug:
+	case LogLevelDebug:
 		return "DEBUG"
-	case logLevelInfo:
+	case LogLevelInfo:
 		return "INFO"
-	case logLevelError:
+	case LogLevelError:
 		return "ERROR"
 	default:
 		fmt.Print("Unknown log level")
@@ -39,12 +70,18 @@ func currentTimestamp() string {
 	return time.Now().Format("2006-01-02 15:04:05")
 }
 
-func log(log_level logLevel, args ...interface{}) {
+func log(log_level LogLevel, args ...interface{}) {
+	if log_level < currentLevel {
+		return
+	}
 	value := fmt.Sprintln(args...)
 	fmt.Printf("%s %s %s", currentTimestamp(), log_level.String(), value)
 }
 
-func logf(log_level logLevel, format string, args ...interface{}) {
+func logf(log_level LogLevel, format string, args ...interface{}) {
+	if log_level < currentLevel {
+		return
+	}
 	value := fmt.Sprintf(format, args...)
 	fmt.Printf("%s %s %s\n", currentTimestamp(), log_level.String(), value)
 }
@@ -82,33 +119,33 @@ func (logger *Logger) Errorf(format string, args ...interface{}) {
 }
 
 func Trace(args ...interface{}) {
-	log(logLevelTrace, args...)
+	log(LogLevelTrace, args...)
 }
 
 func Tracef(format string, args ...interface{}) {
-	logf(logLevelTrace, format, args...)
+	logf(LogLevelTrace, format, args...)
 }
 
 func Debug(args ...interface{}) {
-	log(logLevelDebug, args...)
+	log(LogLevelDebug, args...)
 }
 
 func Debugf(format string, args ...interface{}) {
-	logf(logLevelDebug, format, args...)
+	logf(LogLevelDebug, format, args...)
 }
 
 func Info(args ...interface{}) {
-	log(logLevelInfo, args...)
+	log(LogLevelInfo, args...)
 }
 
 func Infof(format string, args ...interface{}) {
-	logf(logLevelInfo, format, args...)
+	logf(LogLevelInfo, format, args...)
 }
 
 func Error(args ...interface{}) {
-	log(logLevelError, args...)
+	log(LogLevelError, args...)
 }
 
 func Errorf(format string, args ...interface{}) {
-	logf(logLevelError, format, args...)
+	logf(LogLevelError, format, args...)
 }
