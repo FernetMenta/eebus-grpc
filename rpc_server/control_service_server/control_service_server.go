@@ -6,6 +6,8 @@ package control_service_server
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net"
@@ -20,6 +22,7 @@ import (
 	eg_lpc_server "github.com/enbility/eebus-grpc/rpc_server/usecase_server/eg/lpc"
 	"github.com/enbility/eebus-grpc/rpc_services/control_service"
 	shipapi "github.com/enbility/ship-go/api"
+	"github.com/enbility/ship-go/cert"
 	"github.com/enbility/spine-go/model"
 	"github.com/enbility/spine-go/spine"
 	"github.com/looplab/fsm"
@@ -413,6 +416,36 @@ func (h *Server) SubscribeDiscoveryEvents(
 			}
 		}
 	}
+}
+
+func (h *Server) GetCertificate(_ context.Context, _ *control_service.GetCertificateRequest) (*control_service.GetCertificateResponse, error) {
+	h.Debug("Received get certificate command")
+
+	if h.certificate == nil {
+		return nil, fmt.Errorf("no certificate available")
+	}
+
+	// PEM-encode the certificate
+	pemData := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: h.certificate.Certificate[0],
+	})
+
+	// Compute SKI from the certificate
+	leaf, err := x509.ParseCertificate(h.certificate.Certificate[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse certificate: %v", err)
+	}
+
+	ski, err := cert.SkiFromCertificate(leaf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute SKI: %v", err)
+	}
+
+	return &control_service.GetCertificateResponse{
+		CertificatePem: string(pemData),
+		Ski:            ski,
+	}, nil
 }
 
 func (h *Server) Start(ipv4Addr string, port *int) (int, error) {

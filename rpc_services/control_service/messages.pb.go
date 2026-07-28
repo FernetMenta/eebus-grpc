@@ -746,6 +746,97 @@ func (x *DiscoveryEvent) GetIsTrusted() bool {
 	return false
 }
 
+type GetCertificateRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *GetCertificateRequest) Reset() {
+	*x = GetCertificateRequest{}
+	mi := &file_control_service_messages_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCertificateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCertificateRequest) ProtoMessage() {}
+
+func (x *GetCertificateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_control_service_messages_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCertificateRequest.ProtoReflect.Descriptor instead.
+func (*GetCertificateRequest) Descriptor() ([]byte, []int) {
+	return file_control_service_messages_proto_rawDescGZIP(), []int{12}
+}
+
+type GetCertificateResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// PEM-encoded X.509 certificate of the local EEBus service.
+	CertificatePem string `protobuf:"bytes,1,opt,name=certificate_pem,json=certificatePem,proto3" json:"certificate_pem,omitempty"`
+	// Subject Key Identifier (SKI) derived from the certificate, hex-encoded.
+	Ski string `protobuf:"bytes,2,opt,name=ski,proto3" json:"ski,omitempty"`
+}
+
+func (x *GetCertificateResponse) Reset() {
+	*x = GetCertificateResponse{}
+	mi := &file_control_service_messages_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCertificateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCertificateResponse) ProtoMessage() {}
+
+func (x *GetCertificateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_control_service_messages_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCertificateResponse.ProtoReflect.Descriptor instead.
+func (*GetCertificateResponse) Descriptor() ([]byte, []int) {
+	return file_control_service_messages_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetCertificateResponse) GetCertificatePem() string {
+	if x != nil {
+		return x.CertificatePem
+	}
+	return ""
+}
+
+func (x *GetCertificateResponse) GetSki() string {
+	if x != nil {
+		return x.Ski
+	}
+	return ""
+}
+
 var File_control_service_messages_proto protoreflect.FileDescriptor
 
 var file_control_service_messages_proto_rawDesc = []byte{
@@ -861,11 +952,18 @@ var file_control_service_messages_proto_rawDesc = []byte{
 	0x30, 0x0a, 0x04, 0x54, 0x79, 0x70, 0x65, 0x12, 0x0b, 0x0a, 0x07, 0x55, 0x4e, 0x4b, 0x4e, 0x4f,
 	0x57, 0x4e, 0x10, 0x00, 0x12, 0x0e, 0x0a, 0x0a, 0x44, 0x49, 0x53, 0x43, 0x4f, 0x56, 0x45, 0x52,
 	0x45, 0x44, 0x10, 0x01, 0x12, 0x0b, 0x0a, 0x07, 0x52, 0x45, 0x4d, 0x4f, 0x56, 0x45, 0x44, 0x10,
-	0x02, 0x42, 0x3d, 0x5a, 0x3b, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f,
-	0x65, 0x6e, 0x62, 0x69, 0x6c, 0x69, 0x74, 0x79, 0x2f, 0x65, 0x65, 0x62, 0x75, 0x73, 0x2d, 0x67,
-	0x72, 0x70, 0x63, 0x2f, 0x72, 0x70, 0x63, 0x5f, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x73,
-	0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x5f, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65,
-	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x02, 0x22, 0x17, 0x0a, 0x15, 0x47, 0x65, 0x74, 0x43, 0x65, 0x72, 0x74, 0x69, 0x66, 0x69, 0x63,
+	0x61, 0x74, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0x53, 0x0a, 0x16, 0x47, 0x65,
+	0x74, 0x43, 0x65, 0x72, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x65, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x12, 0x27, 0x0a, 0x0f, 0x63, 0x65, 0x72, 0x74, 0x69, 0x66, 0x69, 0x63,
+	0x61, 0x74, 0x65, 0x5f, 0x70, 0x65, 0x6d, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0e, 0x63,
+	0x65, 0x72, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x65, 0x50, 0x65, 0x6d, 0x12, 0x10, 0x0a,
+	0x03, 0x73, 0x6b, 0x69, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x73, 0x6b, 0x69, 0x42,
+	0x3d, 0x5a, 0x3b, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x65, 0x6e,
+	0x62, 0x69, 0x6c, 0x69, 0x74, 0x79, 0x2f, 0x65, 0x65, 0x62, 0x75, 0x73, 0x2d, 0x67, 0x72, 0x70,
+	0x63, 0x2f, 0x72, 0x70, 0x63, 0x5f, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x73, 0x2f, 0x63,
+	0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x5f, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x62, 0x06,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -881,7 +979,7 @@ func file_control_service_messages_proto_rawDescGZIP() []byte {
 }
 
 var file_control_service_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_control_service_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_control_service_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_control_service_messages_proto_goTypes = []any{
 	(DiscoveryEvent_Type)(0),                // 0: control_service.DiscoveryEvent.Type
 	(*EmptyRequest)(nil),                    // 1: control_service.EmptyRequest
@@ -896,26 +994,28 @@ var file_control_service_messages_proto_goTypes = []any{
 	(*SubscribeUseCaseEventsResponse)(nil),  // 10: control_service.SubscribeUseCaseEventsResponse
 	(*SubscribeDiscoveryEventsRequest)(nil), // 11: control_service.SubscribeDiscoveryEventsRequest
 	(*DiscoveryEvent)(nil),                  // 12: control_service.DiscoveryEvent
-	(DeviceCategory_Enum)(0),                // 13: control_service.DeviceCategory.Enum
-	(DeviceType_Enum)(0),                    // 14: control_service.DeviceType.Enum
-	(EntityType_Enum)(0),                    // 15: control_service.EntityType.Enum
-	(*common_types.EntityAddress)(nil),      // 16: common_types.EntityAddress
-	(*UseCase)(nil),                         // 17: control_service.UseCase
-	(*UseCaseEvent)(nil),                    // 18: control_service.UseCaseEvent
+	(*GetCertificateRequest)(nil),           // 13: control_service.GetCertificateRequest
+	(*GetCertificateResponse)(nil),          // 14: control_service.GetCertificateResponse
+	(DeviceCategory_Enum)(0),                // 15: control_service.DeviceCategory.Enum
+	(DeviceType_Enum)(0),                    // 16: control_service.DeviceType.Enum
+	(EntityType_Enum)(0),                    // 17: control_service.EntityType.Enum
+	(*common_types.EntityAddress)(nil),      // 18: common_types.EntityAddress
+	(*UseCase)(nil),                         // 19: control_service.UseCase
+	(*UseCaseEvent)(nil),                    // 20: control_service.UseCaseEvent
 }
 var file_control_service_messages_proto_depIdxs = []int32{
-	13, // 0: control_service.SetConfigRequest.device_categories:type_name -> control_service.DeviceCategory.Enum
-	14, // 1: control_service.SetConfigRequest.device_type:type_name -> control_service.DeviceType.Enum
-	15, // 2: control_service.SetConfigRequest.entity_types:type_name -> control_service.EntityType.Enum
-	15, // 3: control_service.AddEntityRequest.type:type_name -> control_service.EntityType.Enum
-	16, // 4: control_service.AddEntityRequest.address:type_name -> common_types.EntityAddress
-	16, // 5: control_service.RemoveEntityRequest.address:type_name -> common_types.EntityAddress
-	16, // 6: control_service.AddUseCaseRequest.entity_address:type_name -> common_types.EntityAddress
-	17, // 7: control_service.AddUseCaseRequest.use_case:type_name -> control_service.UseCase
-	16, // 8: control_service.SubscribeUseCaseEventsRequest.entity_address:type_name -> common_types.EntityAddress
-	17, // 9: control_service.SubscribeUseCaseEventsRequest.use_case:type_name -> control_service.UseCase
-	16, // 10: control_service.SubscribeUseCaseEventsResponse.remote_entity_address:type_name -> common_types.EntityAddress
-	18, // 11: control_service.SubscribeUseCaseEventsResponse.use_case_event:type_name -> control_service.UseCaseEvent
+	15, // 0: control_service.SetConfigRequest.device_categories:type_name -> control_service.DeviceCategory.Enum
+	16, // 1: control_service.SetConfigRequest.device_type:type_name -> control_service.DeviceType.Enum
+	17, // 2: control_service.SetConfigRequest.entity_types:type_name -> control_service.EntityType.Enum
+	17, // 3: control_service.AddEntityRequest.type:type_name -> control_service.EntityType.Enum
+	18, // 4: control_service.AddEntityRequest.address:type_name -> common_types.EntityAddress
+	18, // 5: control_service.RemoveEntityRequest.address:type_name -> common_types.EntityAddress
+	18, // 6: control_service.AddUseCaseRequest.entity_address:type_name -> common_types.EntityAddress
+	19, // 7: control_service.AddUseCaseRequest.use_case:type_name -> control_service.UseCase
+	18, // 8: control_service.SubscribeUseCaseEventsRequest.entity_address:type_name -> common_types.EntityAddress
+	19, // 9: control_service.SubscribeUseCaseEventsRequest.use_case:type_name -> control_service.UseCase
+	18, // 10: control_service.SubscribeUseCaseEventsResponse.remote_entity_address:type_name -> common_types.EntityAddress
+	20, // 11: control_service.SubscribeUseCaseEventsResponse.use_case_event:type_name -> control_service.UseCaseEvent
 	0,  // 12: control_service.DiscoveryEvent.type:type_name -> control_service.DiscoveryEvent.Type
 	13, // [13:13] is the sub-list for method output_type
 	13, // [13:13] is the sub-list for method input_type
@@ -936,7 +1036,7 @@ func file_control_service_messages_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_control_service_messages_proto_rawDesc,
 			NumEnums:      1,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

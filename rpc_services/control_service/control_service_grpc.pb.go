@@ -33,6 +33,7 @@ const (
 	ControlService_AddUseCase_FullMethodName               = "/control_service.ControlService/AddUseCase"
 	ControlService_SubscribeUseCaseEvents_FullMethodName   = "/control_service.ControlService/SubscribeUseCaseEvents"
 	ControlService_SubscribeDiscoveryEvents_FullMethodName = "/control_service.ControlService/SubscribeDiscoveryEvents"
+	ControlService_GetCertificate_FullMethodName           = "/control_service.ControlService/GetCertificate"
 )
 
 // ControlServiceClient is the client API for ControlService service.
@@ -68,6 +69,8 @@ type ControlServiceClient interface {
 	// current set of visible services is replayed as DISCOVERED events before
 	// any live events are forwarded (atomic — no duplicate replay events).
 	SubscribeDiscoveryEvents(ctx context.Context, in *SubscribeDiscoveryEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DiscoveryEvent], error)
+	// Returns the PEM-encoded certificate and SKI of the local EEBus service.
+	GetCertificate(ctx context.Context, in *GetCertificateRequest, opts ...grpc.CallOption) (*GetCertificateResponse, error)
 }
 
 type controlServiceClient struct {
@@ -206,6 +209,16 @@ func (c *controlServiceClient) SubscribeDiscoveryEvents(ctx context.Context, in 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type ControlService_SubscribeDiscoveryEventsClient = grpc.ServerStreamingClient[DiscoveryEvent]
 
+func (c *controlServiceClient) GetCertificate(ctx context.Context, in *GetCertificateRequest, opts ...grpc.CallOption) (*GetCertificateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCertificateResponse)
+	err := c.cc.Invoke(ctx, ControlService_GetCertificate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ControlServiceServer is the server API for ControlService service.
 // All implementations must embed UnimplementedControlServiceServer
 // for forward compatibility.
@@ -239,6 +252,8 @@ type ControlServiceServer interface {
 	// current set of visible services is replayed as DISCOVERED events before
 	// any live events are forwarded (atomic — no duplicate replay events).
 	SubscribeDiscoveryEvents(*SubscribeDiscoveryEventsRequest, grpc.ServerStreamingServer[DiscoveryEvent]) error
+	// Returns the PEM-encoded certificate and SKI of the local EEBus service.
+	GetCertificate(context.Context, *GetCertificateRequest) (*GetCertificateResponse, error)
 	mustEmbedUnimplementedControlServiceServer()
 }
 
@@ -281,6 +296,9 @@ func (UnimplementedControlServiceServer) SubscribeUseCaseEvents(*SubscribeUseCas
 }
 func (UnimplementedControlServiceServer) SubscribeDiscoveryEvents(*SubscribeDiscoveryEventsRequest, grpc.ServerStreamingServer[DiscoveryEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method SubscribeDiscoveryEvents not implemented")
+}
+func (UnimplementedControlServiceServer) GetCertificate(context.Context, *GetCertificateRequest) (*GetCertificateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCertificate not implemented")
 }
 func (UnimplementedControlServiceServer) mustEmbedUnimplementedControlServiceServer() {}
 func (UnimplementedControlServiceServer) testEmbeddedByValue()                        {}
@@ -487,6 +505,24 @@ func _ControlService_SubscribeDiscoveryEvents_Handler(srv interface{}, stream gr
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type ControlService_SubscribeDiscoveryEventsServer = grpc.ServerStreamingServer[DiscoveryEvent]
 
+func _ControlService_GetCertificate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCertificateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControlServiceServer).GetCertificate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ControlService_GetCertificate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControlServiceServer).GetCertificate(ctx, req.(*GetCertificateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ControlService_ServiceDesc is the grpc.ServiceDesc for ControlService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -529,6 +565,10 @@ var ControlService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AddUseCase",
 			Handler:    _ControlService_AddUseCase_Handler,
+		},
+		{
+			MethodName: "GetCertificate",
+			Handler:    _ControlService_GetCertificate_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
