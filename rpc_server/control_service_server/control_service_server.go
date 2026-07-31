@@ -19,7 +19,9 @@ import (
 	"github.com/enbility/eebus-grpc/rpc_server"
 	"github.com/enbility/eebus-grpc/rpc_server/usecase_server"
 	cs_lpc_server "github.com/enbility/eebus-grpc/rpc_server/usecase_server/cs/lpc"
+	cs_lpp_server "github.com/enbility/eebus-grpc/rpc_server/usecase_server/cs/lpp"
 	eg_lpc_server "github.com/enbility/eebus-grpc/rpc_server/usecase_server/eg/lpc"
+	eg_lpp_server "github.com/enbility/eebus-grpc/rpc_server/usecase_server/eg/lpp"
 	"github.com/enbility/eebus-grpc/rpc_services/control_service"
 	shipapi "github.com/enbility/ship-go/api"
 	"github.com/enbility/ship-go/cert"
@@ -314,7 +316,15 @@ func (h *Server) AddUseCase(_ context.Context, req *control_service.AddUseCaseRe
 			}
 
 		case model.UseCaseNameTypeLimitationOfPowerProduction:
-			return &control_service.AddUseCaseResponse{}, errors.New("Not implemented")
+			useCaseServer = cs_lpp_server.NewServer(
+				&h.eebusService.Service,
+				entity,
+			)
+			useCaseEntry = useCaseEntryType{
+				entityAddress: entityAddress,
+				useCase:       req.GetUseCase(),
+				useCaseServer: useCaseServer,
+			}
 		default:
 			return &control_service.AddUseCaseResponse{}, fmt.Errorf("Unknown use case '%v' for role CS", req.GetUseCase().GetName().String())
 		}
@@ -331,7 +341,15 @@ func (h *Server) AddUseCase(_ context.Context, req *control_service.AddUseCaseRe
 				useCaseServer: useCaseServer,
 			}
 		case model.UseCaseNameTypeLimitationOfPowerProduction:
-			return &control_service.AddUseCaseResponse{}, errors.New("Not implemented")
+			useCaseServer = eg_lpp_server.NewServer(
+				&h.eebusService.Service,
+				entity,
+			)
+			useCaseEntry = useCaseEntryType{
+				entityAddress: entityAddress,
+				useCase:       req.GetUseCase(),
+				useCaseServer: useCaseServer,
+			}
 		default:
 			return &control_service.AddUseCaseResponse{}, fmt.Errorf("Unknown use case '%v' for role EG", req.GetUseCase().GetName().String())
 		}

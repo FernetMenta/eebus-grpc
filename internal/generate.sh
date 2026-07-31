@@ -47,3 +47,23 @@ protoc \
     --go-grpc_opt=paths=source_relative \
     "$PROTO_PATH/usecases/cs/lpc/service.proto" \
     "$PROTO_PATH/usecases/cs/lpc/messages.proto"
+
+# CS LPP Service
+protoc \
+    --proto_path="$PROTO_PATH" \
+    --go_out="$OUT" \
+    --go_opt=paths=source_relative \
+    --go-grpc_out="$OUT" \
+    --go-grpc_opt=paths=source_relative \
+    "$PROTO_PATH/usecases/cs/lpp/service.proto" \
+    "$PROTO_PATH/usecases/cs/lpp/messages.proto"
+
+# EG LPP Service
+protoc \
+    --proto_path="$PROTO_PATH" \
+    --go_out="$OUT" \
+    --go_opt=paths=source_relative \
+    --go-grpc_out="$OUT" \
+    --go-grpc_opt=paths=source_relative \
+    "$PROTO_PATH/usecases/eg/lpp/service.proto" \
+    "$PROTO_PATH/usecases/eg/lpp/messages.proto"
