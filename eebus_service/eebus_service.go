@@ -5,6 +5,7 @@ package eebus_service
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/enbility/eebus-go/api"
 	"github.com/enbility/eebus-go/service"
@@ -25,7 +26,7 @@ type discoverySubscriber struct {
 
 type Service struct {
 	service.Service
-	isConnected bool
+	isConnected atomic.Bool
 
 	// discoveryMu guards discoverySnapshot and discoverySubscribers.
 	discoveryMu          sync.Mutex
@@ -35,18 +36,17 @@ type Service struct {
 
 func NewService() *Service {
 	return &Service{
-		isConnected:          false,
 		discoverySnapshot:    make(map[string]shipapi.RemoteMdnsService),
 		discoverySubscribers: nil,
 	}
 }
 
 func (h *Service) RemoteServiceConnected(service api.ServiceInterface, identity shipapi.ServiceIdentity) {
-	h.isConnected = true
+	h.isConnected.Store(true)
 }
 
 func (h *Service) RemoteServiceDisconnected(service api.ServiceInterface, identity shipapi.ServiceIdentity) {
-	h.isConnected = false
+	h.isConnected.Store(false)
 }
 
 // ServiceAutoTrustFailed implements api.ServiceReaderInterface.

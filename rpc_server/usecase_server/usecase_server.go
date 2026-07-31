@@ -9,6 +9,11 @@ import (
 	spineapi "github.com/enbility/spine-go/api"
 )
 
+// useCaseEventBufferSize is the channel buffer for use case events.
+// A slow or missing subscriber will have events dropped rather than
+// blocking the eebus-go internal goroutine.
+const useCaseEventBufferSize = 64
+
 type UseCaseServer interface {
 	OnUseCaseEvent(ski string, device spineapi.DeviceRemoteInterface, entity spineapi.EntityRemoteInterface, event api.EventType)
 	GetUseCase() api.UseCaseInterface
@@ -24,7 +29,7 @@ type BaseUseCaseServer struct {
 
 func NewBaseUseCaseServer() *BaseUseCaseServer {
 	return &BaseUseCaseServer{
-		events: make(chan *control_service.SubscribeUseCaseEventsResponse),
+		events: make(chan *control_service.SubscribeUseCaseEventsResponse, useCaseEventBufferSize),
 	}
 }
 
@@ -42,7 +47,11 @@ func (h *BaseUseCaseServer) OnUseCaseEvent(ski string, device spineapi.DeviceRem
 		RemoteEntityAddress: remoteEntityAddress,
 		UseCaseEvent:        &useCaseEvent,
 	}
-	h.events <- &useCaseEventResponse
+	select {
+	case h.events <- &useCaseEventResponse:
+	default:
+		log.Infof("UseCaseEvent channel full; dropping event for SKI %s", ski)
+	}
 }
 
 func (h *BaseUseCaseServer) GetEvents() chan *control_service.SubscribeUseCaseEventsResponse {

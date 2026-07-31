@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/enbility/eebus-go/api"
@@ -82,6 +83,7 @@ type Server struct {
 	grpcIpv4Addr     string
 	certificate      *tls.Certificate
 
+	mu              sync.Mutex
 	useCaseRegistry []useCaseEntryType
 
 	log.Logger
@@ -102,14 +104,23 @@ func (h *Server) StartService(_ context.Context, _ *control_service.EmptyRequest
 	if h.eebusService.IsRunning() {
 		return &control_service.EmptyResponse{}, fmt.Errorf("Service is already running")
 	}
+
+	h.mu.Lock()
 	if h.stateMachine.Cannot(EventStart) {
+		h.mu.Unlock()
 		return &control_service.EmptyResponse{}, fmt.Errorf("Service is not ready")
 	}
+	h.mu.Unlock()
+
 	h.eebusService.Start()
 	if !h.eebusService.IsRunning() {
 		return &control_service.EmptyResponse{}, fmt.Errorf("Failed to start service")
 	}
+
+	h.mu.Lock()
 	h.stateMachine.Event(context.Background(), EventStart)
+	h.mu.Unlock()
+
 	return &control_service.EmptyResponse{}, nil
 }
 
@@ -118,14 +129,23 @@ func (h *Server) StopService(_ context.Context, _ *control_service.EmptyRequest)
 	if !h.eebusService.IsRunning() {
 		return &control_service.EmptyResponse{}, fmt.Errorf("Service is not running")
 	}
+
+	h.mu.Lock()
 	if h.stateMachine.Cannot(EventStop) {
+		h.mu.Unlock()
 		return &control_service.EmptyResponse{}, fmt.Errorf("Service is not running")
 	}
+	h.mu.Unlock()
+
 	h.eebusService.Shutdown()
 	if h.eebusService.IsRunning() {
 		return &control_service.EmptyResponse{}, fmt.Errorf("Failed to stop service")
 	}
+
+	h.mu.Lock()
 	h.stateMachine.Event(context.Background(), EventStop)
+	h.mu.Unlock()
+
 	return &control_service.EmptyResponse{}, nil
 }
 
@@ -133,6 +153,7 @@ func (h *Server) ResetService(_ context.Context, _ *control_service.EmptyRequest
 	h.Debug("Received reset command")
 	h.eebusService.Shutdown()
 
+	h.mu.Lock()
 	h.stateMachine = NewStateMachine()
 
 	var useCaseServer usecase_server.UseCaseServer = nil
@@ -143,16 +164,21 @@ func (h *Server) ResetService(_ context.Context, _ *control_service.EmptyRequest
 		}
 	}
 	h.useCaseRegistry = []useCaseEntryType{}
+	h.mu.Unlock()
 
 	return &control_service.EmptyResponse{}, nil
 }
 
 func (h *Server) SetConfig(_ context.Context, req *control_service.SetConfigRequest) (*control_service.EmptyResponse, error) {
 	h.Debug("Received set config command")
+
+	h.mu.Lock()
 	if !h.stateMachine.Is(StateSetup) {
+		h.mu.Unlock()
 		h.Error("Service is not in setup state")
 		return &control_service.EmptyResponse{}, fmt.Errorf("Service is not in setup state")
 	}
+	h.mu.Unlock()
 	var device_categories []shipapi.DeviceCategoryType
 	for _, category := range req.GetDeviceCategories() {
 		device_categories = append(device_categories, shipapi.DeviceCategoryType(category))
@@ -189,24 +215,36 @@ func (h *Server) SetConfig(_ context.Context, req *control_service.SetConfigRequ
 
 func (h *Server) StartSetup(_ context.Context, _ *control_service.EmptyRequest) (*control_service.EmptyResponse, error) {
 	h.Debug("Received start setup command")
+
+	h.mu.Lock()
 	if h.stateMachine.Cannot(EventReady) {
+		h.mu.Unlock()
 		return &control_service.EmptyResponse{}, fmt.Errorf("Service is not in setup state")
 	}
+	h.mu.Unlock()
+
 	var err error
 	err = h.eebusService.Setup()
 	if err != nil {
 		return &control_service.EmptyResponse{}, fmt.Errorf("Failed to setup service: %v", err)
 	}
+
+	h.mu.Lock()
 	h.stateMachine.Event(context.Background(), EventReady)
+	h.mu.Unlock()
+
 	return &control_service.EmptyResponse{}, nil
 }
 
 func (h *Server) AddEntity(_ context.Context, req *control_service.AddEntityRequest) (*control_service.EmptyResponse, error) {
 	h.Debug("Received add entity command")
 
+	h.mu.Lock()
 	if h.stateMachine.Is(StateSetup) {
+		h.mu.Unlock()
 		return &control_service.EmptyResponse{}, fmt.Errorf("Service is not in ready state")
 	}
+	h.mu.Unlock()
 
 	entityAddress := type_conversions.ConvertRPCEntityAddress(req.GetAddress())
 	res := h.eebusService.LocalDevice().Entity(entityAddress)
@@ -227,9 +265,13 @@ func (h *Server) AddEntity(_ context.Context, req *control_service.AddEntityRequ
 
 func (h *Server) RemoveEntity(_ context.Context, req *control_service.RemoveEntityRequest) (*control_service.EmptyResponse, error) {
 	h.Debug("Received remove entity command")
+
+	h.mu.Lock()
 	if h.stateMachine.Is(StateSetup) {
+		h.mu.Unlock()
 		return &control_service.EmptyResponse{}, fmt.Errorf("Service is not in ready state")
 	}
+	h.mu.Unlock()
 
 	entityAddress := type_conversions.ConvertRPCEntityAddress(req.GetAddress())
 	entity := h.eebusService.LocalDevice().Entity(entityAddress)
@@ -244,9 +286,12 @@ func (h *Server) RemoveEntity(_ context.Context, req *control_service.RemoveEnti
 func (h *Server) RegisterRemoteSki(_ context.Context, req *control_service.RegisterRemoteSkiRequest) (*control_service.EmptyResponse, error) {
 	h.Debug("Received register remote SKI command")
 
+	h.mu.Lock()
 	if !h.stateMachine.Is(StateReady) && !h.stateMachine.Is(StateRunning) {
+		h.mu.Unlock()
 		return &control_service.EmptyResponse{}, fmt.Errorf("Service must be in ready or running state")
 	}
+	h.mu.Unlock()
 
 	h.eebusService.RegisterRemoteService(shipapi.ServiceIdentity{SKI: req.GetRemoteSki()})
 
@@ -365,7 +410,9 @@ func (h *Server) AddUseCase(_ context.Context, req *control_service.AddUseCaseRe
 	default:
 		return &control_service.AddUseCaseResponse{}, fmt.Errorf("Unknown role '%v'", req.GetUseCase().GetActor().String())
 	}
+	h.mu.Lock()
 	h.useCaseRegistry = append(h.useCaseRegistry, useCaseEntry)
+	h.mu.Unlock()
 
 	port, err := useCaseServer.Start(h.grpcIpv4Addr, nil)
 	if err != nil {
@@ -386,12 +433,16 @@ func (h *Server) SubscribeUseCaseEvents(req *control_service.SubscribeUseCaseEve
 		useCase:       req.GetUseCase(),
 		useCaseServer: nil,
 	}
+
+	h.mu.Lock()
 	for _, entry := range h.useCaseRegistry {
 		if entry.Equals(&referenceEntry) {
 			useCaseServer = entry.useCaseServer
 			break
 		}
 	}
+	h.mu.Unlock()
+
 	if useCaseServer == nil {
 		return fmt.Errorf("Use case not found")
 	}
@@ -408,9 +459,12 @@ func (h *Server) SubscribeDiscoveryEvents(
 	_ *control_service.SubscribeDiscoveryEventsRequest,
 	stream control_service.ControlService_SubscribeDiscoveryEventsServer,
 ) error {
+	h.mu.Lock()
 	if !h.stateMachine.Is(StateReady) && !h.stateMachine.Is(StateRunning) {
+		h.mu.Unlock()
 		return fmt.Errorf("Service must be in ready or running state")
 	}
+	h.mu.Unlock()
 
 	snapshot, ch, cancel := h.eebusService.SubscribeDiscoveries()
 	defer cancel()

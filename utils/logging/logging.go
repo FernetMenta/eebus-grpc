@@ -6,12 +6,13 @@ package logging
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
 type Logger struct{}
 
-type LogLevel int
+type LogLevel int32
 
 const (
 	LogLevelTrace LogLevel = iota
@@ -21,16 +22,20 @@ const (
 )
 
 // currentLevel controls the minimum severity that gets printed.
-var currentLevel LogLevel = LogLevelTrace
+var currentLevel atomic.Int32
+
+func init() {
+	currentLevel.Store(int32(LogLevelTrace))
+}
 
 // SetLevel sets the minimum log level. Messages below this level are discarded.
 func SetLevel(level LogLevel) {
-	currentLevel = level
+	currentLevel.Store(int32(level))
 }
 
 // GetLevel returns the current minimum log level.
 func GetLevel() LogLevel {
-	return currentLevel
+	return LogLevel(currentLevel.Load())
 }
 
 // ParseLevel converts a string (case-insensitive) to a LogLevel.
@@ -71,7 +76,7 @@ func currentTimestamp() string {
 }
 
 func log(log_level LogLevel, args ...interface{}) {
-	if log_level < currentLevel {
+	if log_level < LogLevel(currentLevel.Load()) {
 		return
 	}
 	value := fmt.Sprintln(args...)
@@ -79,7 +84,7 @@ func log(log_level LogLevel, args ...interface{}) {
 }
 
 func logf(log_level LogLevel, format string, args ...interface{}) {
-	if log_level < currentLevel {
+	if log_level < LogLevel(currentLevel.Load()) {
 		return
 	}
 	value := fmt.Sprintf(format, args...)
