@@ -4,6 +4,7 @@
 package type_conversions
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -34,6 +35,81 @@ var deviceTypeMap = map[control_service.DeviceType_Enum]model.DeviceTypeType{
 	control_service.DeviceType_CHARGING_STATION:          model.DeviceTypeTypeChargingStation,
 }
 
+// entityTypeMap maps proto EntityType_Enum values to the SPINE model strings.
+var entityTypeMap = map[control_service.EntityType_Enum]model.EntityTypeType{
+	control_service.EntityType_Battery:                       model.EntityTypeTypeBattery,
+	control_service.EntityType_Compressor:                    model.EntityTypeTypeCompressor,
+	control_service.EntityType_DeviceInformation:             model.EntityTypeTypeDeviceInformation,
+	control_service.EntityType_DHWCircuit:                    model.EntityTypeTypeDHWCircuit,
+	control_service.EntityType_DHWStorage:                    model.EntityTypeTypeDHWStorage,
+	control_service.EntityType_Dishwasher:                    model.EntityTypeTypeDishwasher,
+	control_service.EntityType_Dryer:                         model.EntityTypeTypeDryer,
+	control_service.EntityType_ElectricalImmersionHeater:     model.EntityTypeTypeElectricalImmersionHeater,
+	control_service.EntityType_Fan:                           model.EntityTypeTypeFan,
+	control_service.EntityType_GasHeatingAppliance:           model.EntityTypeTypeGasHeatingAppliance,
+	control_service.EntityType_Generic:                       model.EntityTypeTypeGeneric,
+	control_service.EntityType_HeatingBufferStorage:          model.EntityTypeTypeHeatingBufferStorage,
+	control_service.EntityType_HeatingCircuit:                model.EntityTypeTypeHeatingCircuit,
+	control_service.EntityType_HeatingObject:                 model.EntityTypeTypeHeatingObject,
+	control_service.EntityType_HeatingZone:                   model.EntityTypeTypeHeatingZone,
+	control_service.EntityType_HeatPumpAppliance:             model.EntityTypeTypeHeatPumpAppliance,
+	control_service.EntityType_HeatSinkCircuit:               model.EntityTypeTypeHeatSinkCircuit,
+	control_service.EntityType_HeatSourceCircuit:             model.EntityTypeTypeHeatSourceCircuit,
+	control_service.EntityType_HeatSourceUnit:                model.EntityTypeTypeHeatSourceUnit,
+	control_service.EntityType_HvacController:                model.EntityTypeTypeHvacController,
+	control_service.EntityType_HvacRoom:                      model.EntityTypeTypeHvacRoom,
+	control_service.EntityType_InstantDHWHeater:              model.EntityTypeTypeInstantDHWheater,
+	control_service.EntityType_Inverter:                      model.EntityTypeTypeInverter,
+	control_service.EntityType_OilHeatingAppliance:           model.EntityTypeTypeOilHeatingAppliance,
+	control_service.EntityType_Pump:                          model.EntityTypeTypePump,
+	control_service.EntityType_RefrigerantCircuit:            model.EntityTypeTypeRefrigerantCircuit,
+	control_service.EntityType_SmartEnergyAppliance:          model.EntityTypeTypeSmartEnergyAppliance,
+	control_service.EntityType_SolarDHWStorage:               model.EntityTypeTypeSolarDHWStorage,
+	control_service.EntityType_SolarThermalCircuit:           model.EntityTypeTypeSolarThermalCircuit,
+	control_service.EntityType_SubMeterElectricity:           model.EntityTypeTypeSubMeterElectricity,
+	control_service.EntityType_TemperatureSensor:             model.EntityTypeTypeTemperatureSensor,
+	control_service.EntityType_Washer:                        model.EntityTypeTypeWasher,
+	control_service.EntityType_BatterySystem:                 model.EntityTypeTypeBatterySystem,
+	control_service.EntityType_ElectricityGenerationSystem:   model.EntityTypeTypeElectricityGenerationSystem,
+	control_service.EntityType_ElectricityStorageSystem:      model.EntityTypeTypeElectricityStorageSystem,
+	control_service.EntityType_GridConnectionPointOfPremises: model.EntityTypeTypeGridConnectionPointOfPremises,
+	control_service.EntityType_Household:                     model.EntityTypeTypeHousehold,
+	control_service.EntityType_PVSystem:                      model.EntityTypeTypePVSystem,
+	control_service.EntityType_EV:                            model.EntityTypeTypeEV,
+	control_service.EntityType_EVSE:                          model.EntityTypeTypeEVSE,
+	control_service.EntityType_ChargingOutlet:                model.EntityTypeTypeChargingOutlet,
+	control_service.EntityType_CEM:                           model.EntityTypeTypeCEM,
+	control_service.EntityType_PV:                            model.EntityTypeTypePV,
+	control_service.EntityType_PVESHybrid:                    model.EntityTypeTypePVESHybrid,
+	control_service.EntityType_ElectricalStorage:             model.EntityTypeTypeElectricalStorage,
+	control_service.EntityType_PVString:                      model.EntityTypeTypePVString,
+	control_service.EntityType_GridGuard:                     model.EntityTypeTypeGridGuard,
+	control_service.EntityType_ControllableSystem:            model.EntityTypeTypeControllableSystem,
+}
+
+func init() {
+	// Verify that every DeviceType_Enum value (except UNKNOWN) has a mapping.
+	for i := range control_service.DeviceType_Enum_name {
+		e := control_service.DeviceType_Enum(i)
+		if e == control_service.DeviceType_UNKNOWN {
+			continue
+		}
+		if _, ok := deviceTypeMap[e]; !ok {
+			panic(fmt.Sprintf("deviceTypeMap missing entry for %s", e))
+		}
+	}
+	// Verify that every EntityType_Enum value (except UNKNOWN) has a mapping.
+	for i := range control_service.EntityType_Enum_name {
+		e := control_service.EntityType_Enum(i)
+		if e == control_service.EntityType_UNKNOWN {
+			continue
+		}
+		if _, ok := entityTypeMap[e]; !ok {
+			panic(fmt.Sprintf("entityTypeMap missing entry for %s", e))
+		}
+	}
+}
+
 // ConvertRPCDeviceType converts a proto DeviceType_Enum to the SPINE model.DeviceTypeType.
 func ConvertRPCDeviceType(dt control_service.DeviceType_Enum) model.DeviceTypeType {
 	if v, ok := deviceTypeMap[dt]; ok {
@@ -42,23 +118,12 @@ func ConvertRPCDeviceType(dt control_service.DeviceType_Enum) model.DeviceTypeTy
 	return model.DeviceTypeTypeGeneric
 }
 
-// entityTypeOverrides covers the two proto enum names that differ from their SPINE equivalents:
-//   - "HvacController" → "HVACController"
-//   - "HvacRoom"       → "HVACRoom"
-//
-// All other EntityType_Enum names already match the SPINE strings exactly, so
-// ConvertRPCEntityType falls back to a direct cast for those.
-var entityTypeOverrides = map[control_service.EntityType_Enum]model.EntityTypeType{
-	control_service.EntityType_HvacController: model.EntityTypeTypeHvacController,
-	control_service.EntityType_HvacRoom:       model.EntityTypeTypeHvacRoom,
-}
-
 // ConvertRPCEntityType converts a proto EntityType_Enum to the SPINE model.EntityTypeType.
 func ConvertRPCEntityType(et control_service.EntityType_Enum) model.EntityTypeType {
-	if v, ok := entityTypeOverrides[et]; ok {
+	if v, ok := entityTypeMap[et]; ok {
 		return v
 	}
-	return model.EntityTypeType(et.String())
+	return model.EntityTypeTypeGeneric
 }
 
 func ConvertRPCEntityAddress(address *common_types.EntityAddress) []model.AddressEntityType {
