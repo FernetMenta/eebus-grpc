@@ -40,6 +40,9 @@ func (h *BaseUseCaseServer) OnUseCaseEvent(ski string, device spineapi.DeviceRem
 	if entity == nil {
 		return
 	}
+	if h.events == nil {
+		return
+	}
 	remoteEntityAddress := type_conversions.ConvertEEBUSEntityAddress(entity.Address().Entity)
 	useCaseEvent := type_conversions.ConvertEEBUSEventType(event)
 	useCaseEventResponse := control_service.SubscribeUseCaseEventsResponse{
@@ -56,4 +59,13 @@ func (h *BaseUseCaseServer) OnUseCaseEvent(ski string, device spineapi.DeviceRem
 
 func (h *BaseUseCaseServer) GetEvents() chan *control_service.SubscribeUseCaseEventsResponse {
 	return h.events
+}
+
+// CloseEvents closes the events channel, unblocking any SubscribeUseCaseEvents
+// stream that is ranging over it. Must be called from the concrete server's Stop().
+func (h *BaseUseCaseServer) CloseEvents() {
+	if h.events != nil {
+		close(h.events)
+		h.events = nil
+	}
 }

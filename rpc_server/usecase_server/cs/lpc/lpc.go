@@ -194,6 +194,7 @@ func (h *Server) Stop() error {
 	if h.grpcServer == nil {
 		return fmt.Errorf("grpc server is not running")
 	}
+	h.CloseEvents()
 	h.grpcServer.Stop()
 	h.Debug("use case server stopped\n")
 	h.grpcServer = nil
