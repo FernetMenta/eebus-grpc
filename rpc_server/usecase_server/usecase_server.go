@@ -18,6 +18,7 @@ type UseCaseServer interface {
 	OnUseCaseEvent(ski string, device spineapi.DeviceRemoteInterface, entity spineapi.EntityRemoteInterface, event api.EventType)
 	GetUseCase() api.UseCaseInterface
 	GetEvents() chan *control_service.SubscribeUseCaseEventsResponse
+	OnSubscriberDisconnected()
 	rpc_server.RPCServer
 }
 
@@ -68,4 +69,11 @@ func (h *BaseUseCaseServer) CloseEvents() {
 		close(h.events)
 		h.events = nil
 	}
+}
+
+// OnSubscriberDisconnected is called when the event stream subscriber disconnects
+// (adapter crash, network failure, etc.). Concrete servers override this to stop
+// heartbeats or clean up resources.
+func (h *BaseUseCaseServer) OnSubscriberDisconnected() {
+	// no-op by default; overridden by EG servers to stop heartbeat
 }

@@ -449,6 +449,7 @@ func (h *Server) SubscribeUseCaseEvents(req *control_service.SubscribeUseCaseEve
 	for event := range useCaseServer.GetEvents() {
 		err := stream.Send(event)
 		if err != nil {
+			useCaseServer.OnSubscriberDisconnected()
 			return fmt.Errorf("Failed to send event: %v", err)
 		}
 	}

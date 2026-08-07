@@ -233,9 +233,15 @@ func (h *Server) Stop() error {
 	if h.grpcServer == nil {
 		return fmt.Errorf("grpc server is not running")
 	}
+	h.uclpc.StopHeartbeat()
 	h.CloseEvents()
 	h.grpcServer.Stop()
 	h.Debug("use case server stopped\n")
 	h.grpcServer = nil
 	return nil
+}
+
+func (h *Server) OnSubscriberDisconnected() {
+	h.uclpc.StopHeartbeat()
+	h.eebusService.Shutdown()
 }
