@@ -47,9 +47,26 @@ func (h *Server) GetUseCase() api.UseCaseInterface {
 	return h.uclpp
 }
 
+// resolveRemoteEntity looks up the remote device and entity for the given SKI and entity address.
+// Returns an error if either is not found.
+func (h *Server) resolveRemoteEntity(ski string, entityAddress []model.AddressEntityType) (spineapi.EntityRemoteInterface, error) {
+	remoteDevice := h.eebusService.LocalDevice().RemoteDeviceForSki(ski)
+	if remoteDevice == nil {
+		return nil, fmt.Errorf("no remote device found for SKI %s", ski)
+	}
+	remoteEntity := remoteDevice.Entity(entityAddress)
+	if remoteEntity == nil {
+		return nil, fmt.Errorf("no remote entity found for address %v", entityAddress)
+	}
+	return remoteEntity, nil
+}
+
 func (h *Server) ProductionLimit(_ context.Context, req *lpp.ProductionLimitRequest) (*lpp.ProductionLimitResponse, error) {
-	remoteDevice := h.eebusService.LocalDevice().RemoteDeviceForSki(req.GetRemoteSki())
-	remoteEntity := remoteDevice.Entity(type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	remoteEntity, err := h.resolveRemoteEntity(req.GetRemoteSki(), type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	if err != nil {
+		return nil, err
+	}
+
 	eebus_limit, resultErr := h.uclpp.ProductionLimit(remoteEntity)
 	rpc_limit := type_conversions.ConvertEEBUSLoadLimit(&eebus_limit)
 	return &lpp.ProductionLimitResponse{
@@ -58,8 +75,10 @@ func (h *Server) ProductionLimit(_ context.Context, req *lpp.ProductionLimitRequ
 }
 
 func (h *Server) WriteProductionLimit(_ context.Context, req *lpp.WriteProductionLimitRequest) (*lpp.WriteProductionLimitResponse, error) {
-	remoteDevice := h.eebusService.LocalDevice().RemoteDeviceForSki(req.GetRemoteSki())
-	remoteEntity := remoteDevice.Entity(type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	remoteEntity, err := h.resolveRemoteEntity(req.GetRemoteSki(), type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	if err != nil {
+		return nil, err
+	}
 
 	resultCh := make(chan model.ResultDataType)
 	resultCB := func(result model.ResultDataType, msgCounter model.MsgCounterType) {
@@ -83,8 +102,10 @@ func (h *Server) WriteProductionLimit(_ context.Context, req *lpp.WriteProductio
 }
 
 func (h *Server) FailsafeProductionActivePowerLimit(_ context.Context, req *lpp.FailsafeProductionActivePowerLimitRequest) (*lpp.FailsafeProductionActivePowerLimitResponse, error) {
-	remoteDevice := h.eebusService.LocalDevice().RemoteDeviceForSki(req.GetRemoteSki())
-	remoteEntity := remoteDevice.Entity(type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	remoteEntity, err := h.resolveRemoteEntity(req.GetRemoteSki(), type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	if err != nil {
+		return nil, err
+	}
 
 	limit, resultErr := h.uclpp.FailsafeProductionActivePowerLimit(remoteEntity)
 
@@ -94,22 +115,29 @@ func (h *Server) FailsafeProductionActivePowerLimit(_ context.Context, req *lpp.
 }
 
 func (h *Server) WriteFailsafeProductionActivePowerLimit(_ context.Context, req *lpp.WriteFailsafeProductionActivePowerLimitRequest) (*lpp.WriteFailsafeProductionActivePowerLimitResponse, error) {
-	remoteDevice := h.eebusService.LocalDevice().RemoteDeviceForSki(req.GetRemoteSki())
-	remoteEntity := remoteDevice.Entity(type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	remoteEntity, err := h.resolveRemoteEntity(req.GetRemoteSki(), type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	if err != nil {
+		return nil, err
+	}
 
 	msgCounter, resultErr := h.uclpp.WriteFailsafeProductionActivePowerLimit(
 		remoteEntity,
 		req.GetLimit(),
 	)
 
+	if msgCounter == nil {
+		return &lpp.WriteFailsafeProductionActivePowerLimitResponse{}, resultErr
+	}
 	return &lpp.WriteFailsafeProductionActivePowerLimitResponse{
 		MsgCounter: uint64(*msgCounter),
 	}, resultErr
 }
 
 func (h *Server) FailsafeDurationMinimum(_ context.Context, req *lpp.FailsafeDurationMinimumRequest) (*lpp.FailsafeDurationMinimumResponse, error) {
-	remoteDevice := h.eebusService.LocalDevice().RemoteDeviceForSki(req.GetRemoteSki())
-	remoteEntity := remoteDevice.Entity(type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	remoteEntity, err := h.resolveRemoteEntity(req.GetRemoteSki(), type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	if err != nil {
+		return nil, err
+	}
 
 	duration, resultErr := h.uclpp.FailsafeDurationMinimum(remoteEntity)
 
@@ -119,14 +147,19 @@ func (h *Server) FailsafeDurationMinimum(_ context.Context, req *lpp.FailsafeDur
 }
 
 func (h *Server) WriteFailsafeDurationMinimum(_ context.Context, req *lpp.WriteFailsafeDurationMinimumRequest) (*lpp.WriteFailsafeDurationMinimumResponse, error) {
-	remoteDevice := h.eebusService.LocalDevice().RemoteDeviceForSki(req.GetRemoteSki())
-	remoteEntity := remoteDevice.Entity(type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	remoteEntity, err := h.resolveRemoteEntity(req.GetRemoteSki(), type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	if err != nil {
+		return nil, err
+	}
 
 	msgCounter, resultErr := h.uclpp.WriteFailsafeDurationMinimum(
 		remoteEntity,
 		time.Duration(req.GetDurationNanoseconds())*time.Nanosecond,
 	)
 
+	if msgCounter == nil {
+		return &lpp.WriteFailsafeDurationMinimumResponse{}, resultErr
+	}
 	return &lpp.WriteFailsafeDurationMinimumResponse{
 		MsgCounter: uint64(*msgCounter),
 	}, resultErr
@@ -145,8 +178,10 @@ func (h *Server) StopHeartbeat(_ context.Context, req *lpp.StopHeartbeatRequest)
 }
 
 func (h *Server) IsHeartbeatWithinDuration(_ context.Context, req *lpp.IsHeartbeatWithinDurationRequest) (*lpp.IsHeartbeatWithinDurationResponse, error) {
-	remoteDevice := h.eebusService.LocalDevice().RemoteDeviceForSki(req.GetRemoteSki())
-	remoteEntity := remoteDevice.Entity(type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	remoteEntity, err := h.resolveRemoteEntity(req.GetRemoteSki(), type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	if err != nil {
+		return nil, err
+	}
 
 	withinDuration := h.uclpp.IsHeartbeatWithinDuration(remoteEntity)
 
@@ -156,8 +191,10 @@ func (h *Server) IsHeartbeatWithinDuration(_ context.Context, req *lpp.IsHeartbe
 }
 
 func (h *Server) ProductionNominalMax(_ context.Context, req *lpp.ProductionNominalMaxRequest) (*lpp.ProductionNominalMaxResponse, error) {
-	remoteDevice := h.eebusService.LocalDevice().RemoteDeviceForSki(req.GetRemoteSki())
-	remoteEntity := remoteDevice.Entity(type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	remoteEntity, err := h.resolveRemoteEntity(req.GetRemoteSki(), type_conversions.ConvertRPCEntityAddress(req.GetRemoteEntityAddress()))
+	if err != nil {
+		return nil, err
+	}
 
 	nominalMax, resultErr := h.uclpp.ProductionNominalMax(remoteEntity)
 
