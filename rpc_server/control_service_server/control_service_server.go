@@ -419,8 +419,15 @@ func (h *Server) AddUseCase(_ context.Context, req *control_service.AddUseCaseRe
 		return &control_service.AddUseCaseResponse{}, fmt.Errorf("Failed to start use case server: %v", err)
 	}
 
+	endpointAddr := h.grpcIpv4Addr
+	if endpointAddr == "0.0.0.0" {
+		if addr, err := getNonLoopbackIPv4(); err == nil {
+			endpointAddr = addr
+		}
+	}
+
 	return &control_service.AddUseCaseResponse{
-		Endpoint: fmt.Sprintf("%s:%v", h.grpcIpv4Addr, port),
+		Endpoint: fmt.Sprintf("%s:%v", endpointAddr, port),
 	}, nil
 }
 
@@ -519,6 +526,39 @@ func (h *Server) GetCertificate(_ context.Context, _ *control_service.GetCertifi
 		CertificatePem: string(pemData),
 		Ski:            ski,
 	}, nil
+}
+
+// getNonLoopbackIPv4 returns the first non-loopback IPv4 address found on the system.
+func getNonLoopbackIPv4() (string, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsLoopback() {
+				continue
+			}
+			if ip4 := ip.To4(); ip4 != nil {
+				return ip4.String(), nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no non-loopback IPv4 address found")
 }
 
 func (h *Server) Start(ipv4Addr string, port *int) (int, error) {
