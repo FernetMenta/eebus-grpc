@@ -66,4 +66,7 @@ ENV KEY_PATH="/certs/myhems_key"
 ENV GRPC_PORT="50051"
 ENV LOG_LEVEL="info"
 
+HEALTHCHECK --interval=60s --timeout=10s --retries=3 --start-period=10s \
+    CMD grpc-health-probe -addr=${GRPC_ENDPOINT:-${IPV4_ADDR}:${GRPC_PORT}}
+
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
