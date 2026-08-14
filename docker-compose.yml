@@ -4,11 +4,13 @@ services:
     container_name: eebus-grpc
     restart: unless-stopped
     environment:
-      # This is the GRPC Server bind address in the docker bridge network 
-      IPV4_ADDR: 172.30.0.10
+      # Option 1: Use GRPC_ENDPOINT (host:port) – takes precedence over IPV4_ADDR + GRPC_PORT
+      GRPC_ENDPOINT: "172.30.0.10:50051"
+      # Option 2: Specify address and port separately (used when GRPC_ENDPOINT is empty)
+      # IPV4_ADDR: 172.30.0.10
+      # GRPC_PORT: 50051
       CRT_PATH: "/certs/myhems_cert"
       KEY_PATH: "/certs/myhems_key"
-      GRPC_PORT: 50051
       # Possible values: trace, debug, info, error
       LOG_LEVEL: info
     networks:
@@ -25,7 +27,7 @@ services:
     healthcheck:
       # If UID/GID mapping has changed with compose user directive, UID app from container will not with pkill
       # UID in this example case would be 1000
-      test: ["CMD-SHELL", "grpc-health-probe -addr=$${IPV4_ADDR}:50051 || pkill -u $$(id -u)"]
+      test: ["CMD-SHELL", "grpc-health-probe -addr=${GRPC_ENDPOINT} || pkill -u $$(id -u)"]
       interval: 60s
       timeout: 10s
       retries: 3

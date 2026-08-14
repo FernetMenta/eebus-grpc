@@ -58,7 +58,8 @@ EXPOSE 50051
 
 VOLUME /certs
 
-# default value for bind address for GRPC server
+# GRPC_ENDPOINT (host:port) takes precedence over IPV4_ADDR + GRPC_PORT
+ENV GRPC_ENDPOINT=""
 ENV IPV4_ADDR="0.0.0.0"
 ENV CRT_PATH="/certs/myhems_cert"
 ENV KEY_PATH="/certs/myhems_key"
