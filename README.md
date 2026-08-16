@@ -13,7 +13,7 @@ go run cmd/main.go \
   -port <rpc-port>
 ```
 
-To start the server, you need to provide the path to the certificate and the private key. The server will listen on the specified port.
+To start the server, you need to provide the path to the certificate and the private key. A single gRPC server will listen on the specified port and host all services (control service + all use case services).
 
 ## Structure
 
@@ -39,8 +39,12 @@ Contains the `.proto` files that define the gRPC API. Which is as analogous as p
 
 ### rpc_server
 
-Implements the gRPC server interfaces. There is the main server `control_service` that is responsible for starting, stopping and configuring the `eebus_service`.
-Additionally, there is one server for each combinitation of eebus use case and actor.
+Implements the gRPC server interfaces. There is a single gRPC server that hosts:
+- The `control_service` responsible for starting, stopping and configuring the `eebus_service`, and for managing use case instances.
+- Use case routers (in `usecase_router/`) that dispatch incoming gRPC calls to the correct use case instance based on the `instance_id` field in each request.
+- Concrete use case implementations (in `usecase_server/`) that hold the business logic for each actor/use case combination (cs/lpc, cs/lpp, eg/lpc, eg/lpp).
+
+When a use case is added via `AddUseCase`, it returns an `instance_id`. All subsequent calls to that use case's gRPC service must include this `instance_id` so the router can dispatch to the correct instance.
 
 ### rpc_services
 
@@ -63,6 +67,7 @@ Build and push multi-platform image (amd64 + arm64):
 ```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
+  -t fernetmenta/iobroker.eebus-grpc:2.0.0 \
   -t fernetmenta/iobroker.eebus-grpc:latest \
   --push .
 ```
@@ -96,6 +101,7 @@ The entrypoint uses these environment variables (with their Dockerfile defaults)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `GRPC_ENDPOINT` | *(empty)* | If set (host:port), takes precedence over IPV4_ADDR + GRPC_PORT |
 | `IPV4_ADDR` | `0.0.0.0` | gRPC server bind address |
 | `CRT_PATH` | `/certs/myhems_cert` | Path to certificate |
 | `KEY_PATH` | `/certs/myhems_key` | Path to private key |

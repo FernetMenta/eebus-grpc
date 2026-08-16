@@ -57,9 +57,10 @@ type ControlServiceClient interface {
 	RemoveEntity(ctx context.Context, in *RemoveEntityRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
 	// Register remote SKI to the EEBus service
 	RegisterRemoteSki(ctx context.Context, in *RegisterRemoteSkiRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
-	// Adds an usecase to the EEBus service
+	// Adds a usecase to the EEBus service. Returns an instance_id that
+	// identifies this use case instance for all subsequent calls.
 	AddUseCase(ctx context.Context, in *AddUseCaseRequest, opts ...grpc.CallOption) (*AddUseCaseResponse, error)
-	// Subscribes to usecase events
+	// Subscribes to usecase events for a given instance.
 	SubscribeUseCaseEvents(ctx context.Context, in *SubscribeUseCaseEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SubscribeUseCaseEventsResponse], error)
 	// Subscribes to discovery events (DISCOVERED / REMOVED) for remote EEBUS
 	// services seen on the local network via mDNS / SHIP.
@@ -240,9 +241,10 @@ type ControlServiceServer interface {
 	RemoveEntity(context.Context, *RemoveEntityRequest) (*EmptyResponse, error)
 	// Register remote SKI to the EEBus service
 	RegisterRemoteSki(context.Context, *RegisterRemoteSkiRequest) (*EmptyResponse, error)
-	// Adds an usecase to the EEBus service
+	// Adds a usecase to the EEBus service. Returns an instance_id that
+	// identifies this use case instance for all subsequent calls.
 	AddUseCase(context.Context, *AddUseCaseRequest) (*AddUseCaseResponse, error)
-	// Subscribes to usecase events
+	// Subscribes to usecase events for a given instance.
 	SubscribeUseCaseEvents(*SubscribeUseCaseEventsRequest, grpc.ServerStreamingServer[SubscribeUseCaseEventsResponse]) error
 	// Subscribes to discovery events (DISCOVERED / REMOVED) for remote EEBUS
 	// services seen on the local network via mDNS / SHIP.

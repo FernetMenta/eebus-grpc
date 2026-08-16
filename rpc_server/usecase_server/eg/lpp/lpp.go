@@ -6,8 +6,6 @@ package lpp
 import (
 	"context"
 	"fmt"
-	"log"
-	"net"
 	"time"
 
 	"github.com/enbility/eebus-go/api"
@@ -18,17 +16,13 @@ import (
 	"github.com/enbility/eebus-grpc/utils/type_conversions"
 	spineapi "github.com/enbility/spine-go/api"
 	"github.com/enbility/spine-go/model"
-	"google.golang.org/grpc"
 )
 
 type Server struct {
 	eebusService *service.Service
 	uclpp        *uc_eg_lpp.LPP
 
-	lpp.UnimplementedEnergyGuardLPPControlServer
 	usecase_server.BaseUseCaseServer
-
-	grpcServer *grpc.Server
 }
 
 func NewServer(eebusService *service.Service, localEntity spineapi.EntityLocalInterface) *Server {
@@ -36,7 +30,6 @@ func NewServer(eebusService *service.Service, localEntity spineapi.EntityLocalIn
 		eebusService:      eebusService,
 		uclpp:             nil,
 		BaseUseCaseServer: *usecase_server.NewBaseUseCaseServer(),
-		grpcServer:        nil,
 	}
 	server.uclpp = uc_eg_lpp.NewLPP(localEntity, server.OnUseCaseEvent)
 	eebusService.AddUseCase(server.uclpp)
@@ -45,6 +38,16 @@ func NewServer(eebusService *service.Service, localEntity spineapi.EntityLocalIn
 
 func (h *Server) GetUseCase() api.UseCaseInterface {
 	return h.uclpp
+}
+
+func (h *Server) Shutdown() {
+	h.uclpp.StopHeartbeat()
+	h.CloseEvents()
+}
+
+func (h *Server) OnSubscriberDisconnected() {
+	h.uclpp.StopHeartbeat()
+	h.eebusService.Shutdown()
 }
 
 // resolveRemoteEntity looks up the remote device and entity for the given SKI and entity address.
@@ -201,47 +204,4 @@ func (h *Server) ProductionNominalMax(_ context.Context, req *lpp.ProductionNomi
 	return &lpp.ProductionNominalMaxResponse{
 		ProductionNominalMax: nominalMax,
 	}, resultErr
-}
-
-func (h *Server) Start(ipv4Addr string, port *int) (int, error) {
-	var res int
-	if port != nil {
-		return -1, fmt.Errorf("port is specifiedm but not allowed")
-	}
-	if h.grpcServer != nil {
-		return -1, fmt.Errorf("grpc server is already running")
-	}
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:0", ipv4Addr))
-	res = lis.Addr().(*net.TCPAddr).Port
-	log.Printf("server running at port %d\n", res)
-
-	if err != nil {
-		return -1, fmt.Errorf("failed to listen: %v", err)
-	}
-	h.grpcServer = grpc.NewServer()
-	lpp.RegisterEnergyGuardLPPControlServer(h.grpcServer, h)
-	go func() {
-		if err := h.grpcServer.Serve(lis); err != nil {
-			log.Fatalf("failed to serve: %v\n", err)
-		}
-	}()
-
-	return res, nil
-}
-
-func (h *Server) Stop() error {
-	if h.grpcServer == nil {
-		return fmt.Errorf("grpc server is not running")
-	}
-	h.uclpp.StopHeartbeat()
-	h.CloseEvents()
-	h.grpcServer.Stop()
-	h.Debug("use case server stopped\n")
-	h.grpcServer = nil
-	return nil
-}
-
-func (h *Server) OnSubscriberDisconnected() {
-	h.uclpp.StopHeartbeat()
-	h.eebusService.Shutdown()
 }

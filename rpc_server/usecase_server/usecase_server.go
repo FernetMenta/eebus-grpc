@@ -2,7 +2,6 @@ package usecase_server
 
 import (
 	"github.com/enbility/eebus-go/api"
-	"github.com/enbility/eebus-grpc/rpc_server"
 	"github.com/enbility/eebus-grpc/rpc_services/control_service"
 	log "github.com/enbility/eebus-grpc/utils/logging"
 	"github.com/enbility/eebus-grpc/utils/type_conversions"
@@ -19,7 +18,8 @@ type UseCaseServer interface {
 	GetUseCase() api.UseCaseInterface
 	GetEvents() chan *control_service.SubscribeUseCaseEventsResponse
 	OnSubscriberDisconnected()
-	rpc_server.RPCServer
+	// Shutdown is called when the use case is being removed (e.g. during reset).
+	Shutdown()
 }
 
 type BaseUseCaseServer struct {
@@ -63,12 +63,18 @@ func (h *BaseUseCaseServer) GetEvents() chan *control_service.SubscribeUseCaseEv
 }
 
 // CloseEvents closes the events channel, unblocking any SubscribeUseCaseEvents
-// stream that is ranging over it. Must be called from the concrete server's Stop().
+// stream that is ranging over it. Must be called from the concrete server's Shutdown().
 func (h *BaseUseCaseServer) CloseEvents() {
 	if h.events != nil {
 		close(h.events)
 		h.events = nil
 	}
+}
+
+// Shutdown is called when the use case is being removed. Concrete servers
+// override this to stop heartbeats or clean up resources.
+func (h *BaseUseCaseServer) Shutdown() {
+	h.CloseEvents()
 }
 
 // OnSubscriberDisconnected is called when the event stream subscriber disconnects

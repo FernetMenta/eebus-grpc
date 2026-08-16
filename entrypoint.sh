@@ -17,4 +17,3 @@ exec /usr/local/bin/eebus-grpc \
     -ipv4Addr "${ADDR}" \
     -log-level "${LOG_LEVEL:-info}" \
     "$@"
-

@@ -26,7 +26,7 @@ type app struct {
 
 func usage() {
 	fmt.Println("Usage:")
-	fmt.Println("  go run generic-eebus/cmd/main.go -port=<port> -remoteski=<remote ski> -certificate-path=<certificate path>")
+	fmt.Println("  go run cmd/main.go -port=<port> -ipv4Addr=<bind address> -certificate-path=<certificate path> -private-key-path=<private key path>")
 }
 
 const (
@@ -37,7 +37,7 @@ const (
 )
 
 func main() {
-	var rpcPort = flag.Int("port", 50051, "The server port")
+	var rpcPort = flag.Int("port", 50051, "The gRPC server port")
 	var rpcIpv4Addr = flag.String("ipv4Addr", "", "ipv4 address to bind the gRPC server to")
 	var certificateFilePath = flag.String("certificate-path", "", "The path to the certificate")
 	var privateKeyFilePath = flag.String("private-key-path", "", "The path to the private key")

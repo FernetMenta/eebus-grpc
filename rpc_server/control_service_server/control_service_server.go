@@ -12,18 +12,23 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/enbility/eebus-go/api"
 	"github.com/enbility/eebus-go/service"
 	"github.com/enbility/eebus-grpc/eebus_service"
 	"github.com/enbility/eebus-grpc/rpc_server"
-	"github.com/enbility/eebus-grpc/rpc_server/usecase_server"
+	"github.com/enbility/eebus-grpc/rpc_server/usecase_router"
 	cs_lpc_server "github.com/enbility/eebus-grpc/rpc_server/usecase_server/cs/lpc"
 	cs_lpp_server "github.com/enbility/eebus-grpc/rpc_server/usecase_server/cs/lpp"
 	eg_lpc_server "github.com/enbility/eebus-grpc/rpc_server/usecase_server/eg/lpc"
 	eg_lpp_server "github.com/enbility/eebus-grpc/rpc_server/usecase_server/eg/lpp"
 	"github.com/enbility/eebus-grpc/rpc_services/control_service"
+	cs_lpc_pb "github.com/enbility/eebus-grpc/rpc_services/usecases/cs/lpc"
+	cs_lpp_pb "github.com/enbility/eebus-grpc/rpc_services/usecases/cs/lpp"
+	eg_lpc_pb "github.com/enbility/eebus-grpc/rpc_services/usecases/eg/lpc"
+	eg_lpp_pb "github.com/enbility/eebus-grpc/rpc_services/usecases/eg/lpp"
 	shipapi "github.com/enbility/ship-go/api"
 	"github.com/enbility/ship-go/cert"
 	"github.com/enbility/spine-go/model"
@@ -33,45 +38,9 @@ import (
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
-	// Use cases - CEM
-
-	// Use cases - CS
-
-	// Use cases - EG
-
-	// Use cases - MA
-
-	// Conversion functions
-
 	log "github.com/enbility/eebus-grpc/utils/logging"
 	"github.com/enbility/eebus-grpc/utils/type_conversions"
 )
-
-type useCaseEntryType struct {
-	entityAddress []model.AddressEntityType
-	useCase       *control_service.UseCase
-	useCaseServer usecase_server.UseCaseServer
-}
-
-func (h *useCaseEntryType) Equals(other *useCaseEntryType) bool {
-	// compare entity address
-	if len(h.entityAddress) != len(other.entityAddress) {
-		return false
-	}
-	for i, address := range h.entityAddress {
-		if address != other.entityAddress[i] {
-			return false
-		}
-	}
-	// compare use case
-	if h.useCase.GetActor() != other.useCase.GetActor() {
-		return false
-	}
-	if h.useCase.GetName() != other.useCase.GetName() {
-		return false
-	}
-	return true
-}
 
 type Server struct {
 	control_service.UnsafeControlServiceServer
@@ -80,11 +49,13 @@ type Server struct {
 	stateMachine     *fsm.FSM
 	grpcServer       *grpc.Server
 	grpcHealthServer *health.Server
-	grpcIpv4Addr     string
 	certificate      *tls.Certificate
 
-	mu              sync.Mutex
-	useCaseRegistry []useCaseEntryType
+	mu       sync.Mutex
+	registry *usecase_router.Registry
+
+	// instanceCounter is used to generate unique instance IDs.
+	instanceCounter atomic.Uint64
 
 	log.Logger
 }
@@ -95,8 +66,14 @@ func NewServer(eebusService *eebus_service.Service, certificate *tls.Certificate
 		stateMachine: NewStateMachine(),
 		grpcServer:   nil,
 		certificate:  certificate,
-		grpcIpv4Addr: "",
+		registry:     usecase_router.NewRegistry(),
 	}
+}
+
+// nextInstanceID generates a unique instance ID.
+func (h *Server) nextInstanceID() string {
+	id := h.instanceCounter.Add(1)
+	return fmt.Sprintf("uc-%d", id)
 }
 
 func (h *Server) StartService(_ context.Context, _ *control_service.EmptyRequest) (*control_service.EmptyResponse, error) {
@@ -155,16 +132,9 @@ func (h *Server) ResetService(_ context.Context, _ *control_service.EmptyRequest
 
 	h.mu.Lock()
 	h.stateMachine = NewStateMachine()
-
-	var useCaseServer usecase_server.UseCaseServer = nil
-	for _, entry := range h.useCaseRegistry {
-		useCaseServer = entry.useCaseServer
-		if useCaseServer != nil {
-			useCaseServer.Stop()
-		}
-	}
-	h.useCaseRegistry = []useCaseEntryType{}
 	h.mu.Unlock()
+
+	h.registry.ShutdownAll()
 
 	return &control_service.EmptyResponse{}, nil
 }
@@ -302,11 +272,7 @@ func (h *Server) AddUseCase(_ context.Context, req *control_service.AddUseCaseRe
 	h.Debug("Received add use case command")
 
 	entityAddress := type_conversions.ConvertRPCEntityAddress(req.GetEntityAddress())
-	h.Debugf("h.eebusService: %v", h.eebusService)
-	h.Debugf("h.eebusService.LocalDevice(): %v", h.eebusService.LocalDevice())
-	h.Debugf("entityAddress: %v", entityAddress)
 	entity := h.eebusService.LocalDevice().Entity(entityAddress)
-	h.Debugf("entity: %v", entity)
 
 	actor := model.UseCaseActorType(req.GetUseCase().GetActor().String())
 	useCaseName := model.UseCaseNameType(req.GetUseCase().GetName().String())
@@ -320,29 +286,20 @@ func (h *Server) AddUseCase(_ context.Context, req *control_service.AddUseCaseRe
 		return &control_service.AddUseCaseResponse{}, fmt.Errorf("Use case already supported")
 	}
 
-	var useCaseEntry useCaseEntryType
-	var useCaseServer usecase_server.UseCaseServer
+	instanceID := h.nextInstanceID()
 
 	switch actor {
 	case model.UseCaseActorTypeCEM:
 		switch useCaseName {
-		case model.UseCaseNameTypeCoordinatedEVCharging:
-			return &control_service.AddUseCaseResponse{}, errors.New("Not implemented")
-		case model.UseCaseNameTypeEVCommissioningAndConfiguration:
-			return &control_service.AddUseCaseResponse{}, errors.New("Not implemented")
-		case model.UseCaseNameTypeMeasurementOfElectricityDuringEVCharging:
-			return &control_service.AddUseCaseResponse{}, errors.New("Not implemented")
-		case model.UseCaseNameTypeEVSECommissioningAndConfiguration:
-			return &control_service.AddUseCaseResponse{}, errors.New("Not implemented")
-		case model.UseCaseNameTypeEVStateOfCharge:
-			return &control_service.AddUseCaseResponse{}, errors.New("Not implemented")
-		case model.UseCaseNameTypeOverloadProtectionByEVChargingCurrentCurtailment:
-			return &control_service.AddUseCaseResponse{}, errors.New("Not implemented")
-		case model.UseCaseNameTypeOptimizationOfSelfConsumptionDuringEVCharging:
-			return &control_service.AddUseCaseResponse{}, errors.New("Not implemented")
-		case model.UseCaseNameTypeVisualizationOfAggregatedBatteryData:
-			return &control_service.AddUseCaseResponse{}, errors.New("Not implemented")
-		case model.UseCaseNameTypeVisualizationOfAggregatedPhotovoltaicData:
+		case model.UseCaseNameTypeCoordinatedEVCharging,
+			model.UseCaseNameTypeEVCommissioningAndConfiguration,
+			model.UseCaseNameTypeMeasurementOfElectricityDuringEVCharging,
+			model.UseCaseNameTypeEVSECommissioningAndConfiguration,
+			model.UseCaseNameTypeEVStateOfCharge,
+			model.UseCaseNameTypeOverloadProtectionByEVChargingCurrentCurtailment,
+			model.UseCaseNameTypeOptimizationOfSelfConsumptionDuringEVCharging,
+			model.UseCaseNameTypeVisualizationOfAggregatedBatteryData,
+			model.UseCaseNameTypeVisualizationOfAggregatedPhotovoltaicData:
 			return &control_service.AddUseCaseResponse{}, errors.New("Not implemented")
 		default:
 			return &control_service.AddUseCaseResponse{}, fmt.Errorf("Unknown use case '%v' for role CEM", req.GetUseCase().GetName().String())
@@ -350,59 +307,30 @@ func (h *Server) AddUseCase(_ context.Context, req *control_service.AddUseCaseRe
 	case model.UseCaseActorTypeControllableSystem:
 		switch useCaseName {
 		case model.UseCaseNameTypeLimitationOfPowerConsumption:
-			useCaseServer = cs_lpc_server.NewServer(
-				&h.eebusService.Service,
-				entity,
-			)
-			useCaseEntry = useCaseEntryType{
-				entityAddress: entityAddress,
-				useCase:       req.GetUseCase(),
-				useCaseServer: useCaseServer,
-			}
+			srv := cs_lpc_server.NewServer(&h.eebusService.Service, entity)
+			h.registry.RegisterCSLPC(instanceID, srv)
 
 		case model.UseCaseNameTypeLimitationOfPowerProduction:
-			useCaseServer = cs_lpp_server.NewServer(
-				&h.eebusService.Service,
-				entity,
-			)
-			useCaseEntry = useCaseEntryType{
-				entityAddress: entityAddress,
-				useCase:       req.GetUseCase(),
-				useCaseServer: useCaseServer,
-			}
+			srv := cs_lpp_server.NewServer(&h.eebusService.Service, entity)
+			h.registry.RegisterCSLPP(instanceID, srv)
 		default:
 			return &control_service.AddUseCaseResponse{}, fmt.Errorf("Unknown use case '%v' for role CS", req.GetUseCase().GetName().String())
 		}
 	case model.UseCaseActorTypeEnergyGuard:
 		switch useCaseName {
 		case model.UseCaseNameTypeLimitationOfPowerConsumption:
-			useCaseServer = eg_lpc_server.NewServer(
-				&h.eebusService.Service,
-				entity,
-			)
-			useCaseEntry = useCaseEntryType{
-				entityAddress: entityAddress,
-				useCase:       req.GetUseCase(),
-				useCaseServer: useCaseServer,
-			}
+			srv := eg_lpc_server.NewServer(&h.eebusService.Service, entity)
+			h.registry.RegisterEGLPC(instanceID, srv)
 		case model.UseCaseNameTypeLimitationOfPowerProduction:
-			useCaseServer = eg_lpp_server.NewServer(
-				&h.eebusService.Service,
-				entity,
-			)
-			useCaseEntry = useCaseEntryType{
-				entityAddress: entityAddress,
-				useCase:       req.GetUseCase(),
-				useCaseServer: useCaseServer,
-			}
+			srv := eg_lpp_server.NewServer(&h.eebusService.Service, entity)
+			h.registry.RegisterEGLPP(instanceID, srv)
 		default:
 			return &control_service.AddUseCaseResponse{}, fmt.Errorf("Unknown use case '%v' for role EG", req.GetUseCase().GetName().String())
 		}
 	case model.UseCaseActorTypeMonitoringAppliance:
 		switch useCaseName {
-		case model.UseCaseNameTypeMonitoringOfGridConnectionPoint:
-			return &control_service.AddUseCaseResponse{}, errors.New("Not implemented")
-		case model.UseCaseNameTypeMonitoringOfPowerConsumption:
+		case model.UseCaseNameTypeMonitoringOfGridConnectionPoint,
+			model.UseCaseNameTypeMonitoringOfPowerConsumption:
 			return &control_service.AddUseCaseResponse{}, errors.New("Not implemented")
 		default:
 			return &control_service.AddUseCaseResponse{}, fmt.Errorf("Unknown use case '%v' for role MA", req.GetUseCase().GetName().String())
@@ -410,49 +338,20 @@ func (h *Server) AddUseCase(_ context.Context, req *control_service.AddUseCaseRe
 	default:
 		return &control_service.AddUseCaseResponse{}, fmt.Errorf("Unknown role '%v'", req.GetUseCase().GetActor().String())
 	}
-	h.mu.Lock()
-	h.useCaseRegistry = append(h.useCaseRegistry, useCaseEntry)
-	h.mu.Unlock()
-
-	port, err := useCaseServer.Start(h.grpcIpv4Addr, nil)
-	if err != nil {
-		return &control_service.AddUseCaseResponse{}, fmt.Errorf("Failed to start use case server: %v", err)
-	}
-
-	endpointAddr := h.grpcIpv4Addr
-	if endpointAddr == "0.0.0.0" {
-		if addr, err := getNonLoopbackIPv4(); err == nil {
-			endpointAddr = addr
-		}
-	}
 
 	return &control_service.AddUseCaseResponse{
-		Endpoint: fmt.Sprintf("%s:%v", endpointAddr, port),
+		InstanceId: instanceID,
 	}, nil
 }
 
 func (h *Server) SubscribeUseCaseEvents(req *control_service.SubscribeUseCaseEventsRequest, stream control_service.ControlService_SubscribeUseCaseEventsServer) error {
-	entityAddress := type_conversions.ConvertRPCEntityAddress(req.GetEntityAddress())
+	instanceID := req.GetInstanceId()
 
-	var useCaseServer usecase_server.UseCaseServer = nil
-	referenceEntry := useCaseEntryType{
-		entityAddress: entityAddress,
-		useCase:       req.GetUseCase(),
-		useCaseServer: nil,
+	useCaseServer, ok := h.registry.Get(instanceID)
+	if !ok {
+		return fmt.Errorf("no use case instance with id %q", instanceID)
 	}
 
-	h.mu.Lock()
-	for _, entry := range h.useCaseRegistry {
-		if entry.Equals(&referenceEntry) {
-			useCaseServer = entry.useCaseServer
-			break
-		}
-	}
-	h.mu.Unlock()
-
-	if useCaseServer == nil {
-		return fmt.Errorf("Use case not found")
-	}
 	for event := range useCaseServer.GetEvents() {
 		err := stream.Send(event)
 		if err != nil {
@@ -528,41 +427,7 @@ func (h *Server) GetCertificate(_ context.Context, _ *control_service.GetCertifi
 	}, nil
 }
 
-// getNonLoopbackIPv4 returns the first non-loopback IPv4 address found on the system.
-func getNonLoopbackIPv4() (string, error) {
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return "", err
-	}
-	for _, iface := range ifaces {
-		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-		addrs, err := iface.Addrs()
-		if err != nil {
-			continue
-		}
-		for _, addr := range addrs {
-			var ip net.IP
-			switch v := addr.(type) {
-			case *net.IPNet:
-				ip = v.IP
-			case *net.IPAddr:
-				ip = v.IP
-			}
-			if ip == nil || ip.IsLoopback() {
-				continue
-			}
-			if ip4 := ip.To4(); ip4 != nil {
-				return ip4.String(), nil
-			}
-		}
-	}
-	return "", fmt.Errorf("no non-loopback IPv4 address found")
-}
-
 func (h *Server) Start(ipv4Addr string, port *int) (int, error) {
-	h.grpcIpv4Addr = ipv4Addr
 	if port == nil {
 		return -1, fmt.Errorf("no port specified")
 	}
@@ -574,16 +439,24 @@ func (h *Server) Start(ipv4Addr string, port *int) (int, error) {
 		return -1, fmt.Errorf("failed to listen: %v", err)
 	}
 	h.grpcServer = grpc.NewServer()
+
+	// Register the control service
 	control_service.RegisterControlServiceServer(h.grpcServer, h)
 
-	// Enbable health server
+	// Register all use case routers on the single server
+	cs_lpc_pb.RegisterControllableSystemLPCControlServer(h.grpcServer, usecase_router.NewCSLPCRouter(h.registry))
+	cs_lpp_pb.RegisterControllableSystemLPPControlServer(h.grpcServer, usecase_router.NewCSLPPRouter(h.registry))
+	eg_lpc_pb.RegisterEnergyGuardLPCControlServer(h.grpcServer, usecase_router.NewEGLPCRouter(h.registry))
+	eg_lpp_pb.RegisterEnergyGuardLPPControlServer(h.grpcServer, usecase_router.NewEGLPPRouter(h.registry))
+
+	// Enable health server
 	h.grpcHealthServer = health.NewServer()
 	grpc_health_v1.RegisterHealthServer(h.grpcServer, h.grpcHealthServer)
 	h.grpcHealthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 
 	go func() {
 		if err := h.grpcServer.Serve(lis); err != nil {
-			fmt.Errorf("failed to serve: %v", err)
+			log.Errorf("failed to serve: %v", err)
 		}
 	}()
 
@@ -594,6 +467,7 @@ func (h *Server) Stop() error {
 	if h.grpcServer == nil {
 		return fmt.Errorf("grpc server is not running")
 	}
+	h.registry.ShutdownAll()
 	if h.grpcHealthServer != nil {
 		h.grpcHealthServer.Shutdown()
 		h.grpcHealthServer = nil
