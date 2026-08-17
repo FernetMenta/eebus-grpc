@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright Pionix GmbH and Contributors to EVerest
 
-export PATH="$HOME/go/bin:$PATH"
+set -e
 
 PROTO_PATH="../protobuf"
 OUT="../rpc_services"
@@ -10,6 +10,8 @@ mkdir -p "$OUT"
 
 # Common Types
 protoc \
+    --plugin=protoc-gen-go=$(go tool -n protoc-gen-go) \
+    --plugin=protoc-gen-go-grpc=$(go tool -n protoc-gen-go-grpc) \
     --proto_path="$PROTO_PATH" \
     --go_out="$OUT" \
     --go_opt=paths=source_relative \
@@ -19,6 +21,8 @@ protoc \
 
 # Control Service
 protoc \
+    --plugin=protoc-gen-go=$(go tool -n protoc-gen-go) \
+    --plugin=protoc-gen-go-grpc=$(go tool -n protoc-gen-go-grpc) \
     --proto_path="$PROTO_PATH" \
     --go_out="$OUT" \
     --go_opt=paths=source_relative \
@@ -31,6 +35,8 @@ protoc \
 
 # EG LPC Service
 protoc \
+    --plugin=protoc-gen-go=$(go tool -n protoc-gen-go) \
+    --plugin=protoc-gen-go-grpc=$(go tool -n protoc-gen-go-grpc) \
     --proto_path="$PROTO_PATH" \
     --go_out="$OUT" \
     --go_opt=paths=source_relative \
@@ -41,6 +47,8 @@ protoc \
 
 # CS LPC Service
 protoc \
+    --plugin=protoc-gen-go=$(go tool -n protoc-gen-go) \
+    --plugin=protoc-gen-go-grpc=$(go tool -n protoc-gen-go-grpc) \
     --proto_path="$PROTO_PATH" \
     --go_out="$OUT" \
     --go_opt=paths=source_relative \
@@ -51,6 +59,8 @@ protoc \
 
 # CS LPP Service
 protoc \
+    --plugin=protoc-gen-go=$(go tool -n protoc-gen-go) \
+    --plugin=protoc-gen-go-grpc=$(go tool -n protoc-gen-go-grpc) \
     --proto_path="$PROTO_PATH" \
     --go_out="$OUT" \
     --go_opt=paths=source_relative \
@@ -61,6 +71,8 @@ protoc \
 
 # EG LPP Service
 protoc \
+    --plugin=protoc-gen-go=$(go tool -n protoc-gen-go) \
+    --plugin=protoc-gen-go-grpc=$(go tool -n protoc-gen-go-grpc) \
     --proto_path="$PROTO_PATH" \
     --go_out="$OUT" \
     --go_opt=paths=source_relative \

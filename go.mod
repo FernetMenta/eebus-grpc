@@ -3,12 +3,12 @@ module github.com/enbility/eebus-grpc
 go 1.24.1
 
 require (
-	github.com/enbility/eebus-go v0.7.1-0.20260720111250-363db3c5c262
+	github.com/enbility/eebus-go v0.7.1-0.20260731142702-0aa83d264add
 	github.com/enbility/ship-go v0.6.1-0.20260518113001-134687068e3c
 	github.com/enbility/spine-go v0.7.1-0.20260520153416-0104ce40c885
 	github.com/looplab/fsm v1.0.2
-	google.golang.org/grpc v1.68.0
-	google.golang.org/protobuf v1.35.2
+	google.golang.org/grpc v1.71.0
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
@@ -28,5 +28,11 @@ require (
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/tools v0.42.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f // indirect
+	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.6.1 // indirect
+)
+
+tool (
+	google.golang.org/grpc/cmd/protoc-gen-go-grpc
+	google.golang.org/protobuf/cmd/protoc-gen-go
 )
