@@ -10,6 +10,9 @@ on:
         description: 'Tag/Version eingeben (z. B. v2.0.1)'
         required: true
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
