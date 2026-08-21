@@ -1,0 +1,44 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag/Version eingeben (z. B. v2.0.1)'
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag_name || github.ref }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Build Binaries
+        run: |
+          TAG="${{ github.event.inputs.tag_name || github.ref_name }}"
+          echo "Baue Binaries für Version: $TAG"
+          mkdir -p dist
+          
+          GOOS=windows GOARCH=amd64 go build -ldflags="-X main.version=${TAG}" -o dist/eebus-grpc-windows-amd64.exe ./cmd/main.go
+          GOOS=linux GOARCH=amd64 go build -ldflags="-X main.version=${TAG}" -o dist/eebus-grpc-linux-amd64 ./cmd/main.go
+          GOOS=linux GOARCH=arm64 go build -ldflags="-X main.version=${TAG}" -o dist/eebus-grpc-linux-arm64 ./cmd/main.go
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
+          files: dist/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
