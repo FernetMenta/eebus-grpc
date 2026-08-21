@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"path/filepath"
 
 	log "github.com/enbility/eebus-grpc/utils/logging"
 
@@ -25,8 +26,12 @@ type app struct {
 }
 
 func usage() {
-	fmt.Println("Usage:")
-	fmt.Println("  go run cmd/main.go -port=<port> -ipv4Addr=<bind address> -certificate-path=<certificate path> -private-key-path=<private key path>")
+	// filepath.Base sorgt dafür, dass nur der Dateiname (z.B. "myapp") 
+	// ausgegeben wird und nicht der gesamte Pfad (z.B. "./bin/myapp").
+	exeName := filepath.Base(os.Args[0])
+
+	fmt.Printf("Usage:\n")
+	fmt.Printf("  %s -port=<port> -ipv4Addr=<bind address> -certificate-path=<certificate path> -private-key-path=<private key path>\n", exeName)
 }
 
 const (
