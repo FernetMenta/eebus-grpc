@@ -60,32 +60,6 @@ Contains utility functions.
 - [Dummy CEM](cmd/dummy_cem/README.md)
 
 
-## Build image
-
-Build and push multi-platform image (amd64 + arm64):
-
-```bash
-docker buildx build \
-  --platform linux/amd64,linux/arm64 \
-  -t fernetmenta/iobroker.eebus-grpc:2.0.0 \
-  -t fernetmenta/iobroker.eebus-grpc:latest \
-  --push .
-```
-
-Note: This requires a buildx builder with the `docker-container` driver (for multi-platform support). If your current builder doesn't support arm64, set one up:
-
-```bash
-docker buildx create --name multiarch --use
-docker buildx inspect --bootstrap
-```
-
-Local testing (single platform, loaded into local docker):
-
-```bash
-docker buildx build --platform linux/amd64 -t eebus-grpc:amd64 --load .
-docker buildx build --platform linux/arm64 -t eebus-grpc:arm64 --load .
-```
-
 ## Run commands
 Run grpc server (certs will be created automatically in the specified certs directory if not exist!)
 ```bash
@@ -94,7 +68,7 @@ docker run --rm -it \
   --network=host \
   -v "$PWD/certs:/certs" \
   -e LOG_LEVEL=debug \
-  fernetmenta/iobroker.eebus-grpc:latest
+  fernetmenta/eebus-grpc:latest
 ```
 
 The entrypoint uses these environment variables (with their Dockerfile defaults):
