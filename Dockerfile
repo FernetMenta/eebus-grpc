@@ -5,6 +5,9 @@ FROM --platform=$BUILDPLATFORM golang:1.26-alpine3.24 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
+# Dynamically switch Go compiler version based on go.mod directive
+ENV GOTOOLCHAIN=auto
+
 WORKDIR /src
 
 COPY --link cmd/ cmd/
@@ -16,9 +19,15 @@ COPY --link utils/ utils/
 COPY --link eebus_service/ eebus_service/
 COPY --link go.mod go.sum ./
 
-RUN apk add --no-cache git && go mod download
+RUN apk add --no-cache git
 
-RUN mkdir -p /out && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+# Mount Go module cache so downloaded modules & toolchains persist across builds
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    mkdir -p /out && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go install github.com/grpc-ecosystem/grpc-health-probe@v0.4.52 && \
     cp $(go env GOPATH)/bin/${TARGETOS}_${TARGETARCH}/grpc-health-probe /out/grpc-health-probe || \
     cp $(go env GOPATH)/bin/grpc-health-probe /out/grpc-health-probe
