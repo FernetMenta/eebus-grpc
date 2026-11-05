@@ -1,0 +1,174 @@
+name: Weekly Base Image Refresh (GHCR)
+
+# Rebuilds the latest released image when its runtime base image (alpine:3.24)
+# has been updated upstream. Each refresh increments the revision suffix, e.g.
+# v2.0.4-r1 -> v2.0.4-r2, and re-points the plain version tag (v2.0.4) and
+# `latest` at the newly built image.
+
+on:
+  schedule:
+    # Every Monday at 05:30 UTC
+    - cron: '30 5 * * 1'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force a rebuild even if the base image has not changed'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  RUNTIME_BASE: alpine:3.24
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lowercase Repository Name
+        run: echo "REPO_LOWERCASE=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Find the highest released version (vX.Y.Z) and the highest existing
+      # revision for it from the tags already present on the GHCR repository.
+      - name: Determine latest version and revision
+        id: current
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/${REPO_LOWERCASE}"
+
+          # Obtain a pull token and list all tags via the registry v2 API.
+          TOKEN=$(curl -fsSL \
+            -u "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+            "https://ghcr.io/token?scope=repository:${REPO_LOWERCASE}:pull" \
+            | sed -E 's/.*"token":"([^"]+)".*/\1/')
+
+          ALL_TAGS=$(curl -fsSL \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "https://ghcr.io/v2/${REPO_LOWERCASE}/tags/list" \
+            | tr ',' '\n' | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+(-r[0-9]+)?' | sort -u || true)
+
+          if [ -z "${ALL_TAGS}" ]; then
+            echo "No version tags found on ${IMAGE}; nothing to refresh." >&2
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Discovered tags:"
+          echo "${ALL_TAGS}"
+
+          # Highest semver among plain version tags.
+          VERSION=$(echo "${ALL_TAGS}" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -V | tail -n1)
+          if [ -z "${VERSION}" ]; then
+            echo "No plain vX.Y.Z tag found; cannot determine version." >&2
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Highest revision for that version.
+          REV=$(echo "${ALL_TAGS}" | grep -E "^${VERSION}-r[0-9]+$" \
+            | sed -E "s/^${VERSION}-r//" | sort -n | tail -n1)
+          if [ -z "${REV}" ]; then
+            REV=1
+          fi
+          NEXT_REV=$((REV + 1))
+
+          echo "version=${VERSION}"      >> "$GITHUB_OUTPUT"
+          echo "revision=${REV}"         >> "$GITHUB_OUTPUT"
+          echo "next_revision=${NEXT_REV}" >> "$GITHUB_OUTPUT"
+          echo "found=true"              >> "$GITHUB_OUTPUT"
+          echo "Latest version: ${VERSION} (current revision r${REV})"
+
+      - name: Checkout the released tag
+        if: steps.current.outputs.found == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.current.outputs.version }}
+
+      # Compare the base-image digest recorded on the current published image
+      # with the digest the base tag resolves to right now.
+      - name: Detect base image change
+        if: steps.current.outputs.found == 'true'
+        id: detect
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/${REPO_LOWERCASE}"
+          CURRENT_TAG="${{ steps.current.outputs.version }}-r${{ steps.current.outputs.revision }}"
+
+          # Current base tag digest.
+          docker buildx imagetools inspect "${RUNTIME_BASE}" > /tmp/base.txt
+          CURRENT_DIGEST=$(grep -m1 -oE 'sha256:[0-9a-f]{64}' /tmp/base.txt)
+          echo "Current ${RUNTIME_BASE} digest: ${CURRENT_DIGEST}"
+
+          # Base digest recorded on the published image via the OCI label.
+          # For a multi-arch image `.Image` is a map keyed by platform, so dump
+          # the full JSON and let jq find the base-image label on any platform
+          # (CI sets one pinned RUNTIME_BASE, identical across platforms).
+          RECORDED_JSON=$(docker buildx imagetools inspect "${IMAGE}:${CURRENT_TAG}" \
+            --format '{{json .Image}}' 2>/dev/null || echo '{}')
+          RECORDED_BASE=$(echo "${RECORDED_JSON}" | jq -r '
+            [ .. | objects | .Labels? // empty
+              | ."org.opencontainers.image.base.name"? // empty ]
+            | map(select(. != null)) | first // ""' 2>/dev/null || true)
+          echo "Recorded base on ${CURRENT_TAG}: ${RECORDED_BASE:-<none>}"
+          RECORDED_DIGEST=$(echo "${RECORDED_BASE}" | grep -oE 'sha256:[0-9a-f]{64}' || true)
+
+          BASE_PINNED="${RUNTIME_BASE%@*}@${CURRENT_DIGEST}"
+          echo "runtime_base=${BASE_PINNED}" >> "$GITHUB_OUTPUT"
+
+          FORCE="${{ github.event.inputs.force }}"
+          if [ "${FORCE}" = "true" ]; then
+            echo "Force requested; rebuilding regardless of base digest." 
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif [ -z "${RECORDED_DIGEST}" ]; then
+            echo "No recorded base digest on current image; rebuilding to establish one."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif [ "${RECORDED_DIGEST}" != "${CURRENT_DIGEST}" ]; then
+            echo "Base image changed (${RECORDED_DIGEST} -> ${CURRENT_DIGEST}); rebuilding."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Base image unchanged; nothing to do."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push refreshed image
+        if: steps.current.outputs.found == 'true' && steps.detect.outputs.changed == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            RUNTIME_BASE=${{ steps.detect.outputs.runtime_base }}
+          # New revision, plus re-pointing the plain version tag and latest.
+          tags: |
+            ghcr.io/${{ env.REPO_LOWERCASE }}:${{ steps.current.outputs.version }}-r${{ steps.current.outputs.next_revision }}
+            ghcr.io/${{ env.REPO_LOWERCASE }}:${{ steps.current.outputs.version }}
+            ghcr.io/${{ env.REPO_LOWERCASE }}:latest
+          labels: |
+            org.opencontainers.image.base.name=${{ steps.detect.outputs.runtime_base }}
+
+      - name: Summary
+        if: steps.current.outputs.found == 'true'
+        run: |
+          if [ "${{ steps.detect.outputs.changed }}" = "true" ]; then
+            echo "Refreshed ${{ steps.current.outputs.version }} to r${{ steps.current.outputs.next_revision }}." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No refresh needed for ${{ steps.current.outputs.version }} (still r${{ steps.current.outputs.revision }})." >> "$GITHUB_STEP_SUMMARY"
+          fi

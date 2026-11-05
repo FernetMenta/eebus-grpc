@@ -66,12 +66,37 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Resolve the runtime base image (alpine:3.24) to an immutable digest so
+      # the published image records exactly which base it was built on. The
+      # weekly refresh workflow compares against this recorded digest.
+      - name: Resolve runtime base image digest
+        id: base
+        run: |
+          RUNTIME_BASE="alpine:3.24"
+          docker buildx imagetools inspect "$RUNTIME_BASE" > /tmp/base_inspect.txt
+          DIGEST=$(grep -m1 -oE 'Digest:[[:space:]]*sha256:[0-9a-f]{64}' /tmp/base_inspect.txt | grep -oE 'sha256:[0-9a-f]{64}')
+          if [ -z "$DIGEST" ]; then
+            echo "Could not resolve digest for $RUNTIME_BASE" >&2
+            exit 1
+          fi
+          BASE_PINNED="${RUNTIME_BASE%@*}@${DIGEST}"
+          echo "runtime_base=${BASE_PINNED}" >> "$GITHUB_OUTPUT"
+          echo "Resolved $RUNTIME_BASE -> $BASE_PINNED"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            RUNTIME_BASE=${{ steps.base.outputs.runtime_base }}
+          # New version tags always start at revision r1. The plain version tag
+          # and latest point at the same image. The weekly refresh workflow is
+          # what increments the revision (r2, r3, ...) when the base changes.
           tags: |
+            ghcr.io/${{ env.REPO_LOWERCASE }}:${{ github.event.inputs.tag_name || github.ref_name }}-r1
             ghcr.io/${{ env.REPO_LOWERCASE }}:${{ github.event.inputs.tag_name || github.ref_name }}
             ghcr.io/${{ env.REPO_LOWERCASE }}:latest
+          labels: |
+            org.opencontainers.image.base.name=${{ steps.base.outputs.runtime_base }}

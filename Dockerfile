@@ -1,6 +1,11 @@
 # syntax=docker/dockerfile:1.7
 
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine3.24 AS builder
+# Base images are parameterized so CI can pin/track them (e.g. the weekly
+# base-image refresh resolves RUNTIME_BASE to a digest and rebuilds on change).
+ARG BUILDER_BASE=golang:1.26-alpine3.24
+ARG RUNTIME_BASE=alpine:3.24
+
+FROM --platform=$BUILDPLATFORM ${BUILDER_BASE} AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -41,7 +46,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
         -o /out/eebus-grpc \
         ./cmd/main.go
 
-FROM --platform=$TARGETPLATFORM alpine:3.24
+FROM --platform=$TARGETPLATFORM ${RUNTIME_BASE}
+
+# Record the runtime base image reference (and its digest when CI pins one) so
+# the weekly refresh workflow can detect when the base image has changed.
+ARG RUNTIME_BASE=alpine:3.24
+LABEL org.opencontainers.image.base.name="${RUNTIME_BASE}"
 
 RUN apk add --no-cache ca-certificates tzdata
 
