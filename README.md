@@ -81,6 +81,11 @@ The entrypoint uses these environment variables (with their Dockerfile defaults)
 | `KEY_PATH` | `/certs/myhems_key` | Path to private key |
 | `GRPC_PORT` | `50051` | gRPC server port |
 | `LOG_LEVEL` | `info` | Log level: trace, debug, info, error |
+| `WATCHDOG_ENABLED` | `true` | Built-in watchdog. Probes the gRPC health endpoint and kills the main process after `WATCHDOG_FAILURES` consecutive failed probes, so the orchestrator's restart policy can restart the container. Set to `false` to disable |
+| `WATCHDOG_INTERVAL` | `60` | Seconds between probes |
+| `WATCHDOG_TIMEOUT` | `10` | Seconds before a probe counts as failed |
+| `WATCHDOG_FAILURES` | `3` | Consecutive failed probes before the process is killed |
+| `WATCHDOG_START_PERIOD` | `10` | Seconds to wait after start before the first probe |
 ## Docker Compose
 An example [docker-compose.yml](docker-compose.yml) file is provided. You need to adopt the values in that file to your needs. It shows how to use the eebus-grpc container with another iobroker container. Both containers are using Docker Macvlan driver to be able to communicate directly with other devices in the LAN. The Docker Bridge network is used to for the GRPC communication between the containers.
 

@@ -13,6 +13,9 @@ services:
       KEY_PATH: "/certs/myhems_key"
       # Possible values: trace, debug, info, error
       LOG_LEVEL: info
+      # Watchdog: kills the process after 3 failed gRPC probes in a row so
+      # restart policy kicks in. Set to "false" to disable.
+      WATCHDOG_ENABLED: "true"
     networks:
       internal:
         ipv4_address: 172.30.0.10
@@ -24,15 +27,7 @@ services:
     volumes:
       - ./certs:/certs
 
-    healthcheck:
-      # If UID/GID mapping has changed with compose user directive, UID app from container will not with pkill
-      # UID in this example case would be 1000
-      test: ["CMD-SHELL", "grpc-health-probe -addr=${GRPC_ENDPOINT} || pkill -u $$(id -u)"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-  
+
   iobroker:
     container_name: iobroker
     image: buanet/iobroker

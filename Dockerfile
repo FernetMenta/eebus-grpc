@@ -85,7 +85,13 @@ ENV KEY_PATH="/certs/myhems_key"
 ENV GRPC_PORT="50051"
 ENV LOG_LEVEL="info"
 
-HEALTHCHECK --interval=60s --timeout=10s --retries=3 --start-period=10s \
-    CMD grpc-health-probe -addr=${GRPC_ENDPOINT:-${IPV4_ADDR}:${GRPC_PORT}}
+# Built-in watchdog (see entrypoint.sh): kills the main process after
+# WATCHDOG_FAILURES consecutive failed gRPC health probes so the orchestrator
+# can restart the container. Set WATCHDOG_ENABLED=false to turn it off.
+ENV WATCHDOG_ENABLED="true"
+ENV WATCHDOG_INTERVAL="60"
+ENV WATCHDOG_TIMEOUT="10"
+ENV WATCHDOG_FAILURES="3"
+ENV WATCHDOG_START_PERIOD="10"
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
