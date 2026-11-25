@@ -53,6 +53,8 @@ type Server struct {
 
 	mu       sync.Mutex
 	registry *usecase_router.Registry
+	// interfaces restricts mDNS/SHIP to these network interfaces (all if empty).
+	interfaces []string
 
 	// instanceCounter is used to generate unique instance IDs.
 	instanceCounter atomic.Uint64
@@ -68,6 +70,11 @@ func NewServer(eebusService *eebus_service.Service, certificate *tls.Certificate
 		certificate:  certificate,
 		registry:     usecase_router.NewRegistry(),
 	}
+}
+
+// SetInterfaces restricts mDNS and SHIP to the given network interface names.
+func (h *Server) SetInterfaces(ifaces []string) {
+	h.interfaces = ifaces
 }
 
 // nextInstanceID generates a unique instance ID.
@@ -175,6 +182,9 @@ func (h *Server) SetConfig(_ context.Context, req *control_service.SetConfigRequ
 	if err != nil {
 		h.Errorf("Failed to create configuration: %v", err)
 		return &control_service.EmptyResponse{}, fmt.Errorf("Failed to create configuration: %v", err)
+	}
+	if len(h.interfaces) > 0 {
+		configuration.SetInterfaces(h.interfaces)
 	}
 	h.eebusService.Service = *service.NewService(configuration, h.eebusService)
 	h.eebusService.SetLogging(h)

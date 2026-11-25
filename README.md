@@ -81,6 +81,7 @@ The entrypoint uses these environment variables (with their Dockerfile defaults)
 | `KEY_PATH` | `/certs/myhems_key` | Path to private key |
 | `GRPC_PORT` | `50051` | gRPC server port |
 | `LOG_LEVEL` | `info` | Log level: trace, debug, info, error |
+| `EEBUS_ADDR` | *(empty)* | Local IP address (comma-separated for several) of the container's network used for mDNS/SHIP, e.g. `192.168.170.218`. Empty means all interfaces. Set this when the container has several networks and only the LAN one should be announced. Not to be confused with `IPV4_ADDR`, which is the gRPC bind address |
 | `WATCHDOG_ENABLED` | `true` | Built-in watchdog. Probes the gRPC health endpoint and kills the main process after `WATCHDOG_FAILURES` consecutive failed probes, so the orchestrator's restart policy can restart the container. Set to `false` to disable |
 | `WATCHDOG_INTERVAL` | `60` | Seconds between probes |
 | `WATCHDOG_TIMEOUT` | `10` | Seconds before a probe counts as failed |

@@ -84,6 +84,7 @@ ENV CRT_PATH="/certs/myhems_cert"
 ENV KEY_PATH="/certs/myhems_key"
 ENV GRPC_PORT="50051"
 ENV LOG_LEVEL="info"
+ENV EEBUS_ADDR=""
 
 # Built-in watchdog (see entrypoint.sh): kills the main process after
 # WATCHDOG_FAILURES consecutive failed gRPC health probes so the orchestrator

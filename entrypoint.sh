@@ -16,6 +16,7 @@ fi
     -port "${PORT}" \
     -ipv4Addr "${ADDR}" \
     -log-level "${LOG_LEVEL:-info}" \
+    -eebus-addr "${EEBUS_ADDR:-}" \
     "$@" &
 MAIN_PID=$!
 
