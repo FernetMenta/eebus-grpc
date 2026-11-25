@@ -16,11 +16,15 @@ services:
       # Watchdog: kills the process after 3 failed gRPC probes in a row so
       # restart policy kicks in. Set to "false" to disable.
       WATCHDOG_ENABLED: "true"
+      # IP of the LAN (macvlan) interface used for mDNS/SHIP
+      EEBUS_ADDR: "192.168.178.220"
     networks:
       internal:
         ipv4_address: 172.30.0.10
       lan:
         ipv4_address: 192.168.178.220
+        # the macvlan network provides the default route
+        gw_priority: 1
     # adopt to your UID/GID
     user: 1000:1000
     
@@ -38,6 +42,7 @@ services:
         ipv4_address: 172.30.0.11
       lan:
         ipv4_address: 192.168.178.221
+        gw_priority: 1
     ports:
       - "8081:8081"
     volumes:
